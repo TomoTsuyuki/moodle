@@ -553,6 +553,7 @@ abstract class backup_controller_dbops extends backup_dbops {
                         'backup_general_users'              => 'users',
                         'backup_general_anonymize'          => 'anonymize',
                         'backup_general_role_assignments'   => 'role_assignments',
+                        'backup_general_permissions'        => 'permissions',
                         'backup_general_activities'         => 'activities',
                         'backup_general_blocks'             => 'blocks',
                         'backup_general_filters'            => 'filters',
@@ -577,6 +578,7 @@ abstract class backup_controller_dbops extends backup_dbops {
                         'backup_import_blocks'             => 'blocks',
                         'backup_import_filters'            => 'filters',
                         'backup_import_calendarevents'     => 'calendarevents',
+                        'backup_import_permissions'        => 'permissions',
                         'backup_import_questionbank'       => 'questionbank',
                         'backup_import_groups'             => 'groups',
                         'backup_import_competencies'       => 'competencies',
@@ -601,6 +603,7 @@ abstract class backup_controller_dbops extends backup_dbops {
                 $settings = array(
                         'backup_auto_users'              => 'users',
                         'backup_auto_role_assignments'   => 'role_assignments',
+                        'backup_auto_permissions'        => 'permissions',
                         'backup_auto_activities'         => 'activities',
                         'backup_auto_blocks'             => 'blocks',
                         'backup_auto_filters'            => 'filters',
