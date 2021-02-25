@@ -593,6 +593,8 @@ class backup_roles_structure_step extends backup_structure_step {
 
         // To know if we are including role assignments
         $roleassignments = $this->get_setting_value('role_assignments');
+        // To know if we are including permissions.
+        $permissions = $this->get_setting_value('permissions');
 
         // Define each element separated
 
@@ -618,8 +620,9 @@ class backup_roles_structure_step extends backup_structure_step {
         $assignments->add_child($assignment);
 
         // Define sources
-
-        $override->set_source_table('role_capabilities', array('contextid' => backup::VAR_CONTEXTID));
+        if ($permissions) {
+            $override->set_source_table('role_capabilities', array('contextid' => backup::VAR_CONTEXTID));
+        }
 
         // Assignments only added if specified
         if ($roleassignments) {
@@ -1345,6 +1348,8 @@ class backup_users_structure_step extends backup_structure_step {
         $anonymize = $this->get_setting_value('anonymize');
         // To know if we are including role assignments
         $roleassignments = $this->get_setting_value('role_assignments');
+        // To know if we are including permissions.
+        $permissions = $this->get_setting_value('permissions');
 
         // Define each element separate.
 
@@ -1477,7 +1482,9 @@ class backup_users_structure_step extends backup_structure_step {
 
             $preference->set_source_table('user_preferences', array('userid' => backup::VAR_PARENTID));
 
-            $override->set_source_table('role_capabilities', array('contextid' => '/users/user/contextid'));
+            if ($permissions) {
+                $override->set_source_table('role_capabilities', array('contextid' => '/users/user/contextid'));
+            }
 
             // Assignments only added if specified
             if ($roleassignments) {
