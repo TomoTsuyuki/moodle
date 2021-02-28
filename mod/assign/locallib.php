@@ -3655,7 +3655,7 @@ class assign {
 
         // Stream the files into the zip.
         foreach ($filesforzipping as $pathinzip => $storedfile) {
-            $zipwriter->add_file_from_stored_file($pathinzip, $storedfile);
+            $zipwriter->add_files($filesforzipping);
         }
 
         // Finish the archive.
