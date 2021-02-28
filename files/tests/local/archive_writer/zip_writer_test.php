@@ -158,6 +158,106 @@ class zip_writer_testcase extends advanced_testcase {
     }
 
     /**
+     * Test add_directory().
+     */
+    public function test_add_directory(): void {
+        global $CFG;
+
+        $pathinzip = '/some/made/up/name';
+
+        $zipwriter = archive_writer::get_file_writer('test.zip', archive_writer::ZIP_WRITER);
+        $zipwriter->add_directory($pathinzip);
+        $zipwriter->finish();
+
+        $pathtozip = $zipwriter->get_path_to_zip();
+        $zip = new ZipArchive();
+        $opened = $zip->open($pathtozip);
+        $this->assertTrue($opened);
+
+        $archivepath = trim($pathinzip, '/');
+
+        // The archive path does not exist because it is not a file.
+        $this->assertFalse($zip->locateName($archivepath));
+        // The archive path exists because it is not a directory.
+        $this->assertNotFalse($zip->locateName($archivepath . '/'));
+    }
+
+    /**
+     * Test add_file().
+     */
+    public function test_add_file(): void {
+        global $CFG;
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $methods = ['add_file_from_stored_file', 'add_directory', 'add_file_from_filepath', 'add_file_from_string'];
+
+        // Test for calling add_file_from_stored_file, by $file = string.
+        $pathtofileinzip = '/some/made/up/name.txt';
+        $filetoadd = $CFG->dirroot . '/files/tests/fixtures/awesome_file.txt';
+        $zipwriter = $this->getMockBuilder(zip_writer::class)
+            ->disableOriginalConstructor()
+            ->setMethods($methods)
+            ->getMock();
+        $zipwriter->expects($this->once())->method('add_file_from_filepath');
+        $zipwriter->expects($this->never())->method('add_file_from_stored_file');
+        $zipwriter->expects($this->never())->method('add_directory');
+        $zipwriter->expects($this->never())->method('add_file_from_string');
+        $zipwriter->add_file($pathtofileinzip, $filetoadd);
+
+        // Test for calling add_file_from_stored_file, by $file = \stored_file.
+        $course = $this->getDataGenerator()->create_course();
+        $assign = $this->getDataGenerator()->create_module('assign', ['course' => $course->id]);
+        // Add a file to the intro.
+        $filerecord = [
+                'contextid' => context_module::instance($assign->cmid)->id,
+                'component' => 'mod_assign',
+                'filearea'  => 'intro',
+                'itemid'    => 0,
+                'filepath'  => '/',
+                'filename'  => 'fileintro.txt',
+        ];
+        $fs = get_file_storage();
+        $storedfile = $fs->create_file_from_string($filerecord, 'Contents for the assignment, yeow!');
+        $pathtofileinzip = $storedfile->get_filepath() . $storedfile->get_filename();
+        $zipwriter = $this->getMockBuilder(zip_writer::class)
+            ->disableOriginalConstructor()
+            ->setMethods($methods)
+            ->getMock();
+        $zipwriter->expects($this->never())->method('add_file_from_filepath');
+        $zipwriter->expects($this->once())->method('add_file_from_stored_file');
+        $zipwriter->expects($this->never())->method('add_directory');
+        $zipwriter->expects($this->never())->method('add_file_from_string');
+        $zipwriter->add_file($pathtofileinzip, $storedfile);
+
+        // Test for calling add_directory, by $file = null.
+        $pathinzip = '/some/made/up/name';
+        $zipwriter = $this->getMockBuilder(zip_writer::class)
+            ->disableOriginalConstructor()
+            ->setMethods($methods)
+            ->getMock();
+        $zipwriter->expects($this->never())->method('add_file_from_filepath');
+        $zipwriter->expects($this->never())->method('add_file_from_stored_file');
+        $zipwriter->expects($this->once())->method('add_directory');
+        $zipwriter->expects($this->never())->method('add_file_from_string');
+        $zipwriter->add_file($pathinzip, null);
+
+        // Test add_file_from_string, by $file = array.
+        $pathtofileinzip = "/path/to/my/awesome/file.txt";
+        $mycontent = "This is some real awesome content, ya dig?";
+        $zipwriter = $this->getMockBuilder(zip_writer::class)
+            ->disableOriginalConstructor()
+            ->setMethods($methods)
+            ->getMock();
+        $zipwriter->expects($this->never())->method('add_file_from_filepath');
+        $zipwriter->expects($this->never())->method('add_file_from_stored_file');
+        $zipwriter->expects($this->never())->method('add_directory');
+        $zipwriter->expects($this->once())->method('add_file_from_string');
+        $zipwriter->add_file($pathtofileinzip, [$mycontent]);
+
+    }
+
+    /**
      * Test sanitise_filepath().
      *
      * @param string $providedfilepath The provided file path.

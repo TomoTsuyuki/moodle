@@ -115,6 +115,40 @@ class zip_writer extends archive_writer implements file_writer_interface, stream
         fclose($filehandle);
     }
 
+    /**
+     * Add an empty directory to zip.
+     *
+     * @param string $name The path of directory in zip.
+     */
+    public function add_directory(string $name): void {
+        $this->archive->addFile(rtrim($this->sanitise_filepath($name), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR, '');
+    }
+
+    /**
+     * Add file to zip.
+     *
+     * @param string $archivepath Path in zip file.
+     * @param ?string|\stored_file $file \stored_file, null, pathname, or array('content_as_string')
+     * @return void
+     */
+    public function add_file(string $archivepath, $file): void {
+        $archivepath = trim($archivepath, '/');
+
+        if ($file instanceof \stored_file) {
+            $this->add_file_from_stored_file($archivepath, $file);
+        } else if (is_null($file)) {
+            // Save $file as empty directory.
+            $this->add_directory($archivepath);
+        } else if (is_string($file)) {
+            // Save $file as source filepath.
+            $this->add_file_from_filepath($archivepath, $file);
+        } else if (is_array($file)) {
+            // Save $file as contents.
+            $content = reset($file);
+            $this->add_file_from_string($archivepath, $content);
+        }
+    }
+
     public function finish(): void {
         $this->archive->finish();
 
