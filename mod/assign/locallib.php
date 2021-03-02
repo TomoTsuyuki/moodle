@@ -3655,7 +3655,18 @@ class assign {
 
         // Stream the files into the zip.
         foreach ($filesforzipping as $pathinzip => $storedfile) {
-            $zipwriter->add_file_from_stored_file($pathinzip, $storedfile);
+            $archivepath = trim($pathinzip, '/');
+
+            if ($storedfile instanceof \stored_file) {
+                $zipwriter->add_file_from_stored_file($pathinzip, $storedfile);
+            } else if (is_string($storedfile)) {
+                // Save $file as source filepath.
+                $zipwriter->add_file_from_filepath($archivepath, $storedfile);
+            } else if (is_array($storedfile)) {
+                // Save $file as contents.
+                $content = reset($storedfile);
+                $zipwriter->add_file_from_string($archivepath, $content);
+            }
         }
 
         // Finish the archive.
