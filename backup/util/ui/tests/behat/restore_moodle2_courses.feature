@@ -244,3 +244,37 @@ Feature: Restore Moodle 2 course backups
     And I should not see "Topic 16"
     And I should see "Test URL name" in the "Topic 3" "section"
     And I should see "Test forum name" in the "Topic 1" "section"
+
+  @javascript
+  Scenario: Restore a backup with override permission
+    Given the following "permission overrides" exist:
+      | capability         | permission | role           | contextlevel | reference |
+      | enrol/manual:enrol | Allow      | teacher        | Course       | C1        |
+    When I backup "Course 1" course using this options:
+      | Confirmation | Filename | test_backup.mbz |
+    And I select backup "test_backup.mbz"
+    And I select restore as a new course
+    And I should see "Include override permission"
+    And the field "Include override permission" matches value "1"
+    And I process restore using this options:
+    And I navigate to "Users > Permissions" in current page administration
+    And I should see "Non-editing teacher (1)"
+    And I set the field "Advanced role override" to "Non-editing teacher (1)"
+    And "enrol/manual:enrol" capability has "Allow" permission
+
+  @javascript
+  Scenario: Restore a backup without override permission
+    Given I set the following administration settings values:
+      | restore_general_permissions | 0 |
+    Given the following "permission overrides" exist:
+      | capability         | permission | role           | contextlevel | reference |
+      | enrol/manual:enrol | Allow      | teacher        | Course       | C1        |
+    When I backup "Course 1" course using this options:
+      | Confirmation | Filename | test_backup.mbz |
+    And I select backup "test_backup.mbz"
+    And I select restore as a new course
+    And I should see "Include override permission"
+    And the field "Include override permission" matches value "0"
+    And I process restore using this options:
+    And I navigate to "Users > Permissions" in current page administration
+    And I should see "Non-editing teacher (0)"

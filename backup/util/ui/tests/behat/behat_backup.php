@@ -144,19 +144,7 @@ class behat_backup extends behat_base {
         $this->execute("behat_navigation::i_navigate_to_in_current_page_administration", get_string('import'));
 
         // Select the course.
-        $exception = new ExpectationException('"' . $fromcourse . '" course not found in the list of courses to import from',
-            $this->getSession());
-
-        // The argument should be converted to an xpath literal.
-        $fromcourse = behat_context_helper::escape($fromcourse);
-        $xpath = "//div[contains(concat(' ', normalize-space(@class), ' '), ' ics-results ')]" .
-            "/descendant::tr[contains(., $fromcourse)]" .
-            "/descendant::input[@type='radio']";
-        $radionode = $this->find('xpath', $xpath, $exception);
-        $radiofield = new behat_form_field($this->getSession(), $radionode);
-        $radiofield->set_value(1);
-
-        $this->execute("behat_forms::press_button", get_string('continue'));
+        $this->select_course($fromcourse);
 
         // Initial settings.
         $this->fill_backup_restore_form($this->get_step_options($options, "Initial"));
@@ -174,6 +162,19 @@ class behat_backup extends behat_base {
 
         // Continue and redirect to 'to' course.
         $this->execute("behat_general::i_click_on", array(get_string('continue'), 'button'));
+    }
+
+    /**
+     * Choose course which is imported from.
+     *
+     * You should be in 'Course selection' page in import process.
+     *
+     * @Given /^I choose course import from "(?P<from_course_fullname_string>(?:[^"]|\\")*)"$/
+     * @param string $fromcourse
+     */
+    public function i_choose_course_import_from($fromcourse) {
+        // Select the course.
+        $this->select_course($fromcourse);
     }
 
     /**
@@ -224,19 +225,36 @@ class behat_backup extends behat_base {
         // Confirm restore.
         $this->select_backup($backupfilename);
 
-        // The first category in the list.
-        $radionodexpath = "//div[contains(concat(' ', normalize-space(@class), ' '), ' bcs-new-course ')]" .
-            "/descendant::div[contains(concat(' ', normalize-space(@class), ' '), ' restore-course-search ')]" .
-            "/descendant::input[@type='radio']";
-        $this->execute("behat_general::i_click_on", array($radionodexpath, 'xpath_element'));
-
-        // Pressing the continue button of the restore into an existing course section.
-        $continuenodexpath = "//div[contains(concat(' ', normalize-space(@class), ' '), ' bcs-new-course ')]" .
-            "/descendant::input[@type='submit'][@value='" . get_string('continue') . "']";
-        $this->execute("behat_general::i_click_on", array($continuenodexpath, 'xpath_element'));
+        // Select restore as a new course.
+        $this->select_restore_as_a_new_course();
 
         // Common restore process using provided key/value options.
         $this->process_restore($options);
+    }
+
+    /**
+     * Select backup and confirm.
+     *
+     * You should be in 'Restore' page.
+     *
+     * @Given /^I select backup "(?P<backup_filename_string>(?:[^"]|\\")*)"$/
+     * @param string $backupfilename
+     */
+    public function i_select_backup($backupfilename) {
+        // Confirm restore.
+        $this->select_backup($backupfilename);
+    }
+
+    /**
+     * Select restore destination and go next page.
+     *
+     * You should be in 'Destination' page in restore process.
+     *
+     * @Given /^I select restore as a new course$/
+     */
+    public function i_select_restore_as_a_new_course() {
+        // Select restore as a new course.
+        $this->select_restore_as_a_new_course();
     }
 
     /**
@@ -296,6 +314,43 @@ class behat_backup extends behat_base {
     }
 
     /**
+     * Process restore from 'Setting' page.
+     *
+     * You should be in the 'Settings' in restore process.
+     *
+     * @Given /^I process restore using this options:$/
+     * @param TableNode $options Restore forms options or false if no options provided
+     */
+    public function i_process_restore($options = false) {
+        // Common restore process using provided key/value options.
+        $this->process_restore($options);
+    }
+
+    /**
+     * Select course to import and continue to next page.
+     *
+     * @param string $fromcourse
+     * @throws coding_exception
+     */
+    protected function select_course($fromcourse) {
+
+        // Select the course.
+        $exception = new ExpectationException('"' . $fromcourse . '" course not found in the list of courses to import from',
+                $this->getSession());
+
+        // The argument should be converted to an xpath literal.
+        $fromcourse = behat_context_helper::escape($fromcourse);
+        $xpath = "//div[contains(concat(' ', normalize-space(@class), ' '), ' ics-results ')]" .
+                "/descendant::tr[contains(., $fromcourse)]" .
+                "/descendant::input[@type='radio']";
+        $radionode = $this->find('xpath', $xpath, $exception);
+        $radiofield = new behat_form_field($this->getSession(), $radionode);
+        $radiofield->set_value(1);
+
+        $this->execute("behat_forms::press_button", get_string('continue'));
+    }
+
+    /**
      * Selects the backup to restore.
      *
      * @throws ExpectationException
@@ -317,6 +372,24 @@ class behat_backup extends behat_base {
 
         // Confirm the backup contents.
         $this->find_button(get_string('continue'))->press();
+    }
+
+    /**
+     * Select restore as a new course and continue to next page.
+     *
+     * @throws coding_exception
+     */
+    protected function select_restore_as_a_new_course() {
+        // The first category in the list.
+        $radionodexpath = "//div[contains(concat(' ', normalize-space(@class), ' '), ' bcs-new-course ')]" .
+                "/descendant::div[contains(concat(' ', normalize-space(@class), ' '), ' restore-course-search ')]" .
+                "/descendant::input[@type='radio']";
+        $this->execute("behat_general::i_click_on", array($radionodexpath, 'xpath_element'));
+
+        // Pressing the continue button of the restore into an existing course section.
+        $continuenodexpath = "//div[contains(concat(' ', normalize-space(@class), ' '), ' bcs-new-course ')]" .
+                "/descendant::input[@type='submit'][@value='" . get_string('continue') . "']";
+        $this->execute("behat_general::i_click_on", array($continuenodexpath, 'xpath_element'));
     }
 
     /**
