@@ -418,25 +418,24 @@ class moodle1_converter extends base_converter {
     /**
      * Creates the temporary storage for stashed data
      *
-     * This implementation uses backup_ids_temp table.
+     * This implementation uses backup ids cache.
      */
     public function create_stash_storage() {
-        backup_controller_dbops::create_backup_ids_temp_table($this->get_id());
     }
 
     /**
      * Drops the temporary storage of stashed data
      *
-     * This implementation uses backup_ids_temp table.
+     * This implementation uses backup ids cache.
      */
     public function drop_stash_storage() {
-        backup_controller_dbops::drop_backup_ids_temp_table($this->get_id());
+        backup_controller_dbops::purge_temp_caches();
     }
 
     /**
      * Stores some information for later processing
      *
-     * This implementation uses backup_ids_temp table to store data. Make
+     * This implementation uses backup ids cache to store data. Make
      * sure that the $stashname + $itemid combo is unique.
      *
      * @param string $stashname name of the stash
@@ -496,13 +495,7 @@ class moodle1_converter extends base_converter {
      * @return array
      */
     public function get_stash_names() {
-        global $DB;
-
-        $search = array(
-            'backupid' => $this->get_id(),
-        );
-
-        return array_keys($DB->get_records('backup_ids_temp', $search, '', 'itemname'));
+        return backup_muc_manager::get_stores();
     }
 
     /**
@@ -512,14 +505,8 @@ class moodle1_converter extends base_converter {
      * @return array
      */
     public function get_stash_itemids($stashname) {
-        global $DB;
-
-        $search = array(
-            'backupid' => $this->get_id(),
-            'itemname' => $stashname
-        );
-
-        return array_keys($DB->get_records('backup_ids_temp', $search, '', 'itemid'));
+        $cache = backup_muc_manager::get($stashname);
+        return $cache->get_store()->find_all();
     }
 
     /**

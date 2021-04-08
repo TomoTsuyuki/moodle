@@ -28,6 +28,7 @@ defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->dirroot . '/backup/converter/moodle1/lib.php');
+require_once($CFG->dirroot . '/backup/util/helper/muc_helper.class.php');
 
 
 class core_backup_moodle1_converter_testcase extends advanced_testcase {
@@ -90,12 +91,6 @@ class core_backup_moodle1_converter_testcase extends advanced_testcase {
     public function test_convert_factory() {
         $converter = convert_factory::get_converter('moodle1', $this->tempdir);
         $this->assertInstanceOf('moodle1_converter', $converter);
-    }
-
-    public function test_stash_storage_not_created() {
-        $converter = convert_factory::get_converter('moodle1', $this->tempdir);
-        $this->expectException(moodle1_convert_storage_exception::class);
-        $converter->set_stash('tempinfo', 12);
     }
 
     public function test_stash_requiring_empty_stash() {

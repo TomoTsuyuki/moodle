@@ -83,9 +83,6 @@ abstract class restore_prechecks_helper {
         $progress->end_progress();
         $progress->progress($majorstep++);
 
-        // Create temp tables
-        restore_controller_dbops::create_restore_temp_tables($controller->get_restoreid());
-
         // Check we are restoring one backup >= $min20version (very first ok ever)
         $min20version = 2010072300;
         if ($controller->get_info()->backup_version < $min20version) {
@@ -191,7 +188,7 @@ abstract class restore_prechecks_helper {
         }
         // Warnings/errors detected or want to do so explicitly, drop temp tables
         if (!empty($results) || $droptemptablesafter) {
-            restore_controller_dbops::drop_restore_temp_tables($controller->get_restoreid());
+            backup_muc_manager::reset();
         }
 
         // Finish progress and check we got the initial number of steps right.

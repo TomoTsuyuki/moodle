@@ -118,60 +118,6 @@ abstract class backup_controller_dbops extends backup_dbops {
         return $controller;
     }
 
-    public static function create_backup_ids_temp_table($backupid) {
-        global $CFG, $DB;
-        $dbman = $DB->get_manager(); // We are going to use database_manager services
-
-        $xmldb_table = new xmldb_table('backup_ids_temp');
-        $xmldb_table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
-        // Set default backupid (not needed but this enforce any missing backupid). That's hackery in action!
-        $xmldb_table->add_field('backupid', XMLDB_TYPE_CHAR, 32, null, XMLDB_NOTNULL, null, $backupid);
-        $xmldb_table->add_field('itemname', XMLDB_TYPE_CHAR, 160, null, XMLDB_NOTNULL, null, null);
-        $xmldb_table->add_field('itemid', XMLDB_TYPE_INTEGER, 10, null, XMLDB_NOTNULL, null, null);
-        $xmldb_table->add_field('newitemid', XMLDB_TYPE_INTEGER, 10, null, XMLDB_NOTNULL, null, '0');
-        $xmldb_table->add_field('parentitemid', XMLDB_TYPE_INTEGER, 10, null, null, null, null);
-        $xmldb_table->add_field('info', XMLDB_TYPE_TEXT, null, null, null, null, null);
-        $xmldb_table->add_key('primary', XMLDB_KEY_PRIMARY, array('id'));
-        $xmldb_table->add_key('backupid_itemname_itemid_uk', XMLDB_KEY_UNIQUE, array('backupid','itemname','itemid'));
-        $xmldb_table->add_index('backupid_parentitemid_ix', XMLDB_INDEX_NOTUNIQUE, array('backupid','itemname','parentitemid'));
-        $xmldb_table->add_index('backupid_itemname_newitemid_ix', XMLDB_INDEX_NOTUNIQUE, array('backupid','itemname','newitemid'));
-
-        $dbman->create_temp_table($xmldb_table); // And create it
-
-    }
-
-    public static function create_backup_files_temp_table($backupid) {
-        global $CFG, $DB;
-        $dbman = $DB->get_manager(); // We are going to use database_manager services
-
-        $xmldb_table = new xmldb_table('backup_files_temp');
-        $xmldb_table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
-        // Set default backupid (not needed but this enforce any missing backupid). That's hackery in action!
-        $xmldb_table->add_field('backupid', XMLDB_TYPE_CHAR, 32, null, XMLDB_NOTNULL, null, $backupid);
-        $xmldb_table->add_field('contextid', XMLDB_TYPE_INTEGER, 10, null, XMLDB_NOTNULL, null, null);
-        $xmldb_table->add_field('component', XMLDB_TYPE_CHAR, 100, null, XMLDB_NOTNULL, null, null);
-        $xmldb_table->add_field('filearea', XMLDB_TYPE_CHAR, 50, null, XMLDB_NOTNULL, null, null);
-        $xmldb_table->add_field('itemid', XMLDB_TYPE_INTEGER, 10, null, XMLDB_NOTNULL, null, null);
-        $xmldb_table->add_field('info', XMLDB_TYPE_TEXT, null, null, null, null, null);
-        $xmldb_table->add_field('newcontextid', XMLDB_TYPE_INTEGER, 10, null, null, null, null);
-        $xmldb_table->add_field('newitemid', XMLDB_TYPE_INTEGER, 10, null, null, null, null);
-        $xmldb_table->add_key('primary', XMLDB_KEY_PRIMARY, array('id'));
-        $xmldb_table->add_index('backupid_contextid_component_filearea_itemid_ix', XMLDB_INDEX_NOTUNIQUE, array('backupid','contextid','component','filearea','itemid'));
-
-        $dbman->create_temp_table($xmldb_table); // And create it
-    }
-
-    public static function drop_backup_ids_temp_table($backupid) {
-        global $DB;
-        $dbman = $DB->get_manager(); // We are going to use database_manager services
-
-        $targettablename = 'backup_ids_temp';
-        if ($dbman->table_exists($targettablename)) {
-            $table = new xmldb_table($targettablename);
-            $dbman->drop_table($table); // And drop it
-        }
-    }
-
     /**
      * Decode the info field from backup_ids_temp or backup_files_temp.
      *
@@ -468,13 +414,19 @@ abstract class backup_controller_dbops extends backup_dbops {
     public static function backup_includes_mnet_remote_users($backupid) {
         global $CFG, $DB;
 
-        $sql = "SELECT COUNT(*)
-                  FROM {backup_ids_temp} b
-                  JOIN {user} u ON u.id = b.itemid
-                 WHERE b.backupid = ?
-                   AND b.itemname = 'userfinal'
-                   AND u.mnethostid != ?";
-        $count = $DB->count_records_sql($sql, array($backupid, $CFG->mnet_localhost_id));
+        $cache = backup_muc_manager::get('userfinal');
+        $content = $cache->get_store()->find_all();
+
+        if (empty($content)) {
+            return 0;
+        }
+
+        list($sql, $params) = $DB->get_in_or_equal($content);
+        $params[] = $CFG->mnet_localhost_id;
+        $sql = "SELECT COUNT(*) FROM {user} u
+                               WHERE u.id $sql
+                                 AND u.mnethostid != ?";
+        $count = $DB->count_records_sql($sql, $params);
         return (int)(bool)$count;
     }
 
@@ -511,15 +463,20 @@ abstract class backup_controller_dbops extends backup_dbops {
     public static function backup_includes_file_references($backupid) {
         global $CFG, $DB;
 
+        $cache = backup_muc_manager::get('filefinal');
+        $fileids = $cache->get_store()->find_all();
+        if (empty($fileids)) {
+            return 0;
+        }
+
+        list($sql, $params) = $DB->get_in_or_equal($fileids);
+
         $sql = "SELECT count(r.repositoryid)
                   FROM {files} f
                   LEFT JOIN {files_reference} r
                        ON r.id = f.referencefileid
-                  JOIN {backup_ids_temp} bi
-                       ON f.id = bi.itemid
-                 WHERE bi.backupid = ?
-                       AND bi.itemname = 'filefinal'";
-        $count = $DB->count_records_sql($sql, array($backupid));
+                 WHERE f.id $sql";
+        $count = $DB->count_records_sql($sql, $params);
         return (int)(bool)$count;
     }
 
@@ -708,5 +665,12 @@ abstract class backup_controller_dbops extends backup_dbops {
         $progress = array('status' => $status, 'progress' => $progress, 'backupid' => $backupid, 'operation' => $operation);
 
         return $progress;
+    }
+
+    /**
+     * Purge temporary cache.
+     */
+    public static function purge_temp_caches(): void {
+        backup_muc_manager::reset();
     }
 }

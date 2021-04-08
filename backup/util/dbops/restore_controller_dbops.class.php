@@ -108,31 +108,11 @@ abstract class restore_controller_dbops extends restore_dbops {
         return $controller;
     }
 
-    public static function create_restore_temp_tables($restoreid) {
-        global $CFG, $DB;
-        $dbman = $DB->get_manager(); // We are going to use database_manager services
-
-        if ($dbman->table_exists('backup_ids_temp')) { // Table exists, from restore prechecks
-            // TODO: Improve this by inserting/selecting some record to see there is restoreid match
-            // TODO: If not match, exception, table corresponds to another backup/restore operation
-            return true;
-        }
-        backup_controller_dbops::create_backup_ids_temp_table($restoreid);
-        backup_controller_dbops::create_backup_files_temp_table($restoreid);
-        return false;
-    }
-
-    public static function drop_restore_temp_tables($backupid) {
-        global $DB;
-        $dbman = $DB->get_manager(); // We are going to use database_manager services
-
-        $targettablenames = array('backup_ids_temp', 'backup_files_temp');
-        foreach ($targettablenames as $targettablename) {
-            $table = new xmldb_table($targettablename);
-            $dbman->drop_table($table); // And drop it
-        }
-        // Invalidate the backup_ids caches.
-        restore_dbops::reset_backup_ids_cached();
+    /**
+     * Purge temporary cache.
+     */
+    public static function purge_temp_caches() {
+        backup_muc_manager::reset();
     }
 
     /**

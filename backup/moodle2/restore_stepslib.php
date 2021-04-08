@@ -28,12 +28,12 @@
 defined('MOODLE_INTERNAL') || die();
 
 /**
- * delete old directories and conditionally create backup_temp_ids table
+ * delete old directories and conditionally create backup_temp_ids cache
  */
 class restore_create_and_clean_temp_stuff extends restore_execution_step {
 
     protected function define_execution() {
-        $exists = restore_controller_dbops::create_restore_temp_tables($this->get_restoreid()); // temp tables conditionally
+        $exists = !empty(backup_muc_manager::get_stores());
         // If the table already exists, it's because restore_prechecks have been executed in the same
         // request (without problems) and it already contains a bunch of preloaded information (users...)
         // that we aren't going to execute again
@@ -63,7 +63,7 @@ class restore_drop_and_clean_temp_stuff extends restore_execution_step {
 
     protected function define_execution() {
         global $CFG;
-        restore_controller_dbops::drop_restore_temp_tables($this->get_restoreid()); // Drop ids temp table
+        restore_controller_dbops::purge_temp_caches();
         if (empty($CFG->keeptempdirectoriesonbackup)) { // Conditionally
             $progress = $this->task->get_progress();
             $progress->start_progress('Deleting backup dir');
@@ -371,28 +371,25 @@ class restore_gradebook_structure_step extends restore_structure_step {
     protected function after_execute() {
         global $DB;
 
-        $conditions = array(
-            'backupid' => $this->get_restoreid(),
-            'itemname' => 'grade_item'//,
-            //'itemid'   => $itemid
-        );
-        $rs = $DB->get_recordset('backup_ids_temp', $conditions);
+        $idcache = backup_muc_manager::get('grade_item');
+        $cacheitems = $idcache->get_store()->find_all();
 
         // We need this for calculation magic later on.
         $mappings = array();
 
-        if (!empty($rs)) {
-            foreach($rs as $grade_item_backup) {
+        if (!empty($cacheitems)) {
+            foreach ($cacheitems as $gradeitemid) {
+                $gradeitembackup = (object) $idcache->get($gradeitemid);
 
                 // Store the oldid with the new id.
-                $mappings[$grade_item_backup->itemid] = $grade_item_backup->newitemid;
+                $mappings[$gradeitemid] = $gradeitembackup->newitemid;
 
                 $updateobj = new stdclass();
-                $updateobj->id = $grade_item_backup->newitemid;
+                $updateobj->id = $gradeitembackup->newitemid;
 
                 //if this is an activity grade item that needs to be put back in its correct category
-                if (!empty($grade_item_backup->parentitemid)) {
-                    $oldcategoryid = $this->get_mappingid('grade_category', $grade_item_backup->parentitemid, null);
+                if (!empty($gradeitembackup->parentitemid)) {
+                    $oldcategoryid = $this->get_mappingid('grade_category', $gradeitembackup->parentitemid, null);
                     if (!is_null($oldcategoryid)) {
                         $updateobj->categoryid = $oldcategoryid;
                         $DB->update_record('grade_items', $updateobj);
@@ -404,7 +401,6 @@ class restore_gradebook_structure_step extends restore_structure_step {
                 }
             }
         }
-        $rs->close();
 
         // We need to update the calculations for calculated grade items that may reference old
         // grade item ids using ##gi\d+##.
@@ -833,13 +829,14 @@ class restore_review_pending_block_positions extends restore_execution_step {
         global $DB;
 
         // Get all the block_position objects pending to match
-        $params = array('backupid' => $this->get_restoreid(), 'itemname' => 'block_position');
-        $rs = $DB->get_recordset('backup_ids_temp', $params, '', 'itemid, info');
+        $idcache = backup_muc_manager::get('block_position');
+        $cacheitems = $idcache->get_store()->find_all();
         // Process block positions, creating them or accumulating for final step
-        foreach($rs as $posrec) {
+        foreach ($cacheitems as $posid) {
+            $posrec = $idcache->get($posid);
             // Get the complete position object out of the info field.
             $position = backup_controller_dbops::decode_backup_temp_info($posrec->info);
-            // If position is for one already mapped (known) contextid
+            // If position is for one already mapperestore_update_availabilityd (known) contextid
             // process it now, creating the position, else nothing to
             // do, position finally discarded
             if ($newctx = restore_dbops::get_backup_ids_record($this->get_restoreid(), 'context', $position->contextid)) {
@@ -848,7 +845,6 @@ class restore_review_pending_block_positions extends restore_execution_step {
                 $DB->insert_record('block_positions', $position);
             }
         }
-        $rs->close();
     }
 }
 
@@ -882,10 +878,11 @@ class restore_update_availability extends restore_execution_step {
         $dateoffset = $this->apply_date_offset(1) - 1;
 
         // Update all sections that were restored.
-        $params = array('backupid' => $this->get_restoreid(), 'itemname' => 'course_section');
-        $rs = $DB->get_recordset('backup_ids_temp', $params, '', 'newitemid');
+        $idcache = backup_muc_manager::get('course_section');
+        $cacheitems = $idcache->get_store()->find_all();
         $sectionsbyid = null;
-        foreach ($rs as $rec) {
+        foreach ($cacheitems as $recid) {
+            $rec = (object) $idcache->get($recid);
             if (is_null($sectionsbyid)) {
                 $sectionsbyid = array();
                 foreach ($modinfo->get_section_info_all() as $section) {
@@ -906,12 +903,13 @@ class restore_update_availability extends restore_execution_step {
                         $this->get_courseid(), $this->get_logger(), $dateoffset, $this->task);
             }
         }
-        $rs->close();
 
         // Update all modules that were restored.
-        $params = array('backupid' => $this->get_restoreid(), 'itemname' => 'course_module');
-        $rs = $DB->get_recordset('backup_ids_temp', $params, '', 'newitemid');
-        foreach ($rs as $rec) {
+        $idcache = backup_muc_manager::get('course_module');
+        $cacheitems = $idcache->get_store()->find_all();
+
+        foreach ($cacheitems as $recid) {
+            $rec = (object) $idcache->get($recid);
             if (!array_key_exists($rec->newitemid, $modinfo->cms)) {
                 // If the module was not fully restored for some reason
                 // (e.g. due to an earlier error), skip it.
@@ -926,7 +924,6 @@ class restore_update_availability extends restore_execution_step {
                         $this->get_courseid(), $this->get_logger(), $dateoffset, $this->task);
             }
         }
-        $rs->close();
     }
 }
 
@@ -957,10 +954,11 @@ class restore_process_course_modules_availability extends restore_execution_step
         // Do both modules and sections.
         foreach (array('module', 'section') as $table) {
             // Get all the availability objects to process.
-            $params = array('backupid' => $this->get_restoreid(), 'itemname' => $table . '_availability');
-            $rs = $DB->get_recordset('backup_ids_temp', $params, '', 'itemid, info');
+            $idcache = backup_muc_manager::get($table . '_availability');
+            $cacheitems = $idcache->get_store()->find_all();
             // Process availabilities, creating them if everything matches ok.
-            foreach ($rs as $availrec) {
+            foreach ($cacheitems as $availrecid) {
+                $availrec = (object) $idcache->get($availrecid);
                 $allmatchesok = true;
                 // Get the complete legacy availability object.
                 $availability = backup_controller_dbops::decode_backup_temp_info($availrec->info);
@@ -988,7 +986,6 @@ class restore_process_course_modules_availability extends restore_execution_step
                 $DB->set_field('course_' . $table . 's', 'availability', $newvalue,
                         array('id' => $thingid));
             }
-            $rs->close();
         }
     }
 }
@@ -2022,19 +2019,23 @@ class restore_course_legacy_files_step extends restore_execution_step {
     public function define_execution() {
         global $DB;
 
-        // Do a check for legacy files and skip if there are none.
-        $sql = 'SELECT count(*)
-                  FROM {backup_files_temp}
-                 WHERE backupid = ?
-                   AND contextid = ?
-                   AND component = ?
-                   AND filearea  = ?';
-        $params = array($this->get_restoreid(), $this->task->get_old_contextid(), 'course', 'legacy');
+        $cache = backup_muc_manager::get('file_temp');
 
-        if ($DB->count_records_sql($sql, $params)) {
+        $count = 0;
+        $oldcontextid = $this->task->get_old_contextid();
+        foreach ($cache->get_store()->find_all() as $id) {
+            $data = $cache->get($id);
+            if ($data->contextid == $oldcontextid &&
+                $data->component == 'course' &&
+                $data->filearea == 'legacy') {
+                $count++;
+            }
+        }
+
+        if ($count) {
             $DB->set_field('course', 'legacyfiles', 2, array('id' => $this->get_courseid()));
             restore_dbops::send_files_to_pool($this->get_basepath(), $this->get_restoreid(), 'course',
-                'legacy', $this->task->get_old_contextid(), $this->task->get_userid());
+                'legacy', $oldcontextid, $this->task->get_userid());
         }
     }
 }
@@ -4620,7 +4621,7 @@ abstract class restore_activity_structure_step extends restore_structure_step {
  * Structure step in charge of creating/mapping all the qcats and qs
  * by parsing the questions.xml file and checking it against the
  * results calculated by {@link restore_process_categories_and_questions}
- * and stored in backup_ids_temp
+ * and stored in backup ids cache
  */
 class restore_create_categories_and_questions extends restore_structure_step {
 
@@ -4894,20 +4895,46 @@ class restore_create_categories_and_questions extends restore_structure_step {
         global $DB;
 
         // First of all, recode all the created question_categories->parent fields
-        $qcats = $DB->get_records('backup_ids_temp', array(
-                     'backupid' => $this->get_restoreid(),
-                     'itemname' => 'question_category_created'));
-        foreach ($qcats as $qcat) {
-            $dbcat = $DB->get_record('question_categories', array('id' => $qcat->newitemid));
+        $qcatscreatedcache = backup_muc_manager::get('question_category_created');
+        $qcatscreated = $qcatscreatedcache->get_store()->find_all();
+
+        $qcatscache = backup_muc_manager::get('question_category');
+
+        $categories = array();
+        $qcats2 = array();
+        foreach ($qcatscreated as $qcatid) {
+            $qcat = $qcatscreatedcache->get($qcatid);
+            $qcats2[$qcatid] = $qcat;
+            $categories[$qcat['newitemid']] = 1;
+        }
+
+        if (empty($categories)) {
+            return;
+        }
+
+        list($sql, $params) = $DB->get_in_or_equal(array_keys($categories));
+        $rs = $DB->get_records_sql("SELECT * FROM {question_categories} WHERE id $sql", $params);
+
+        $dbcats = array();
+        foreach ($rs as $record) {
+            $dbcats[$record->id] = $record;
+        }
+
+        foreach ($qcats2 as $id => $qcat) {
+            $dbcat = $dbcats[$qcat['newitemid']];
             // Get new parent (mapped or created, so we look in quesiton_category mappings)
-            if ($newparent = $DB->get_field('backup_ids_temp', 'newitemid', array(
-                                 'backupid' => $this->get_restoreid(),
-                                 'itemname' => 'question_category',
-                                 'itemid'   => $dbcat->parent))) {
+            if ($newparent = $qcatscache->get($dbcat->parent)) {
                 // contextids must match always, as far as we always include complete qbanks, just check it
-                $newparentctxid = $DB->get_field('question_categories', 'contextid', array('id' => $newparent));
+                $newparentnewitemid = $newparent['newitemid'];
+                if (isset($dbcats[$newparentnewitemid])) {
+                    $newparentctxid = $dbcats[$newparentnewitemid]->contextid;
+                } else {
+                    $newparentctxid = $DB->get_field('question_categories', 'contextid', array('id' => $newparentnewitemid));
+                    // Save to avoid requerying.
+                    $dbcats[$newparentnewitemid] = (object) array('contenxtid' => $newparentctxid);
+                }
                 if ($dbcat->contextid == $newparentctxid) {
-                    $DB->set_field('question_categories', 'parent', $newparent, array('id' => $dbcat->id));
+                    $DB->set_field('question_categories', 'parent', $newparentnewitemid, array('id' => $dbcat->id));
                 } else {
                     $newparent = 0; // No ctx match for both cats, no parent relationship
                 }
@@ -4922,17 +4949,17 @@ class restore_create_categories_and_questions extends restore_structure_step {
         }
 
         // Now, recode all the created question->parent fields
-        $qs = $DB->get_records('backup_ids_temp', array(
-                  'backupid' => $this->get_restoreid(),
-                  'itemname' => 'question_created'));
-        foreach ($qs as $q) {
-            $dbq = $DB->get_record('question', array('id' => $q->newitemid));
+        $qncreatedcache = backup_muc_manager::get('question_created');
+        $qs = $qncreatedcache->get_store()->find_all();
+
+        $qncache = backup_muc_manager::get('question');
+
+        foreach ($qs as $qid) {
+            $q = $qncreatedcache->get($qid);
+            $dbq = $DB->get_record('question', array('id' => $q['newitemid']));
             // Get new parent (mapped or created, so we look in question mappings)
-            if ($newparent = $DB->get_field('backup_ids_temp', 'newitemid', array(
-                                 'backupid' => $this->get_restoreid(),
-                                 'itemname' => 'question',
-                                 'itemid'   => $dbq->parent))) {
-                $DB->set_field('question', 'parent', $newparent, array('id' => $dbq->id));
+            if ($newparent = $qncache->get($dbq->parent)) {
+                $DB->set_field('question', 'parent', $newparent['newitemid'], array('id' => $dbq->id));
             }
         }
 
@@ -4963,27 +4990,28 @@ class restore_move_module_questions_categories extends restore_execution_step {
         }
 
         $contexts = restore_dbops::restore_get_question_banks($this->get_restoreid(), CONTEXT_MODULE);
+        $qncatcache = backup_muc_manager::get('question_category');
+        $qncatids = $qncatcache->get_store()->find_all();
         foreach ($contexts as $contextid => $contextlevel) {
             // Only if context mapping exists (i.e. the module has been restored)
             if ($newcontext = restore_dbops::get_backup_ids_record($this->get_restoreid(), 'context', $contextid)) {
                 // Update all the qcats having their parentitemid set to the original contextid
-                $modulecats = $DB->get_records_sql("SELECT itemid, newitemid, info
-                                                      FROM {backup_ids_temp}
-                                                     WHERE backupid = ?
-                                                       AND itemname = 'question_category'
-                                                       AND parentitemid = ?", array($this->get_restoreid(), $contextid));
                 $top = question_get_top_category($newcontext->newitemid, true);
                 $oldtopid = 0;
-                foreach ($modulecats as $modulecat) {
+                foreach ($qncatids as $qncatid) {
+                    $qncat = $qncatcache->get($qncatid);
+                    if ($qncat['parentitemid'] != $contextid) {
+                        continue;
+                    }
                     // Before 3.5, question categories could be created at top level.
                     // From 3.5 onwards, all question categories should be a child of a special category called the "top" category.
-                    $info = backup_controller_dbops::decode_backup_temp_info($modulecat->info);
+                    $info = backup_controller_dbops::decode_backup_temp_info($qncat['info']);
                     if ($after35 && empty($info->parent)) {
-                        $oldtopid = $modulecat->newitemid;
-                        $modulecat->newitemid = $top->id;
+                        $oldtopid = $qncat['newitemid'];
+                        $qncat['newitemid'] = $top->id;
                     } else {
                         $cat = new stdClass();
-                        $cat->id = $modulecat->newitemid;
+                        $cat->id = $qncat['newitemid'];
                         $cat->contextid = $newcontext->newitemid;
                         if (empty($info->parent)) {
                             $cat->parent = $top->id;
@@ -4993,8 +5021,8 @@ class restore_move_module_questions_categories extends restore_execution_step {
 
                     // And set new contextid (and maybe update newitemid) also in question_category mapping (will be
                     // used by {@link restore_create_question_files} later.
-                    restore_dbops::set_backup_ids_record($this->get_restoreid(), 'question_category', $modulecat->itemid,
-                            $modulecat->newitemid, $newcontext->newitemid);
+                    restore_dbops::set_backup_ids_record($this->get_restoreid(), 'question_category',
+                        $qncatid, $qncat['newitemid'], $newcontext->newitemid);
                 }
 
                 // Now set the parent id for the question categories that were in the top category in the course context
@@ -5029,42 +5057,62 @@ class restore_create_question_files extends restore_execution_step {
         $progress = $this->task->get_progress();
         $progress->start_progress($this->get_name(), \core\progress\base::INDETERMINATE);
 
-        // Parentitemids of question_createds in backup_ids_temp are the category it is in.
-        // MUST use a recordset, as there is no unique key in the first (or any) column.
-        $catqtypes = $DB->get_recordset_sql("SELECT DISTINCT bi.parentitemid AS categoryid, q.qtype as qtype
-                                               FROM {backup_ids_temp} bi
-                                               JOIN {question} q ON q.id = bi.newitemid
-                                              WHERE bi.backupid = ?
-                                                AND bi.itemname = 'question_created'
-                                           ORDER BY categoryid ASC", array($this->get_restoreid()));
+        // The parentitemid in the cached object is the category the question is in.
+        $qncreatedcache = backup_muc_manager::get('question_created');
+        $qnscreatedids = $qncreatedcache->get_store()->find_all();
 
-        $currentcatid = -1;
-        foreach ($catqtypes as $categoryid => $row) {
-            $qtype = $row->qtype;
+        // Get the actual data and list of question ids to match.
+        $qnscreated = array();
+        $qids = array();
+        foreach ($qnscreatedids as $qncreated) {
+            $temp = $qncreatedcache->get($qncreated);
+            $qnscreated[$temp['newitemid']] = $temp;
+            $qids[$temp['newitemid']] = $temp['newitemid'];
+        }
 
-            // Check if we are in a new category.
-            if ($currentcatid !== $categoryid) {
-                // Report progress for each category.
-                $progress->progress();
+        if (empty($qids)) {
+            $progress->end_progress();
+            return;
+        }
 
-                if (!$qcatmapping = restore_dbops::get_backup_ids_record($this->get_restoreid(),
-                        'question_category', $categoryid)) {
-                    // Something went really wrong, cannot find the question_category for the question_created records.
-                    debugging('Error fetching target context for question', DEBUG_DEVELOPER);
-                    continue;
+        $chunkedarray = array_chunk($qids, 8192);
+        foreach ($chunkedarray as $chunkedids) {
+            $sqlparams[] = $DB->get_in_or_equal($chunkedids);
+        }
+
+        foreach ($sqlparams as $sqlparam) {
+            list($sql, $params) = $sqlparam;
+            $questionsrs = $DB->get_recordset_sql("SELECT id, qtype FROM {question} WHERE id $sql", $params);
+
+            // Build an array of [categoryid][qtype].
+            $questions = array();
+            foreach ($questionsrs as $question) {
+                $categoryid = $qnscreated[$question->id]['parentitemid'];
+                if (!isset($questions[$categoryid])) {
+                    $questions[$categoryid] = array();
                 }
-
+                $questions[$categoryid][$question->qtype] = 1;
+            }
+        }
+        foreach ($questions as $categoryid => $rows) {
+            // Report progress for each category.
+            $progress->progress();
+            if (!$qcatmapping = restore_dbops::get_backup_ids_record($this->get_restoreid(),
+                    'question_category', $categoryid)) {
+                // Something went really wrong, cannot find the question_category for the question_created records.
+                debugging('Error fetching target context for question', DEBUG_DEVELOPER);
+                continue;
                 // Calculate source and target contexts.
                 $oldctxid = $qcatmapping->info->contextid;
                 $newctxid = $qcatmapping->parentitemid;
 
                 $this->send_common_files($oldctxid, $newctxid, $progress);
-                $currentcatid = $categoryid;
-            }
 
-            $this->send_qtype_files($qtype, $oldctxid, $newctxid, $progress);
+                foreach ($rows as $qtype => $yesitsset) {
+                    $this->send_qtype_files($qtype, $oldctxid, $newctxid, $progress);
+                }
+            }
         }
-        $catqtypes->close();
         $progress->end_progress();
     }
 
@@ -5150,12 +5198,12 @@ class restore_process_file_aliases_queue extends restore_execution_step {
         $fs = get_file_storage();
 
         // Load the queue.
-        $rs = $DB->get_recordset('backup_ids_temp',
-            array('backupid' => $this->get_restoreid(), 'itemname' => 'file_aliases_queue'),
-            '', 'info');
+        $idcache = backup_muc_manager::get('file_aliases_queue');
+        $rs = $idcache->get_store()->find_all();
 
         // Iterate over aliases in the queue.
-        foreach ($rs as $record) {
+        foreach ($rs as $rid) {
+            $record = (object) $idcache->get($rid);
             $info = backup_controller_dbops::decode_backup_temp_info($record->info);
 
             // Try to pick a repository instance that should serve the alias.
@@ -5178,17 +5226,19 @@ class restore_process_file_aliases_queue extends restore_execution_step {
                 }
 
                 // Let's see if the referred source file was also included in the backup.
-                $candidates = $DB->get_recordset('backup_files_temp', array(
-                        'backupid' => $this->get_restoreid(),
-                        'contextid' => $reference['contextid'],
-                        'component' => $reference['component'],
-                        'filearea' => $reference['filearea'],
-                        'itemid' => $reference['itemid'],
-                    ), '', 'info, newcontextid, newitemid');
+                $cache = backup_muc_manager::get('files_temp');
+                $candidates = $cache->get_store()->find_all();
 
                 $source = null;
 
-                foreach ($candidates as $candidate) {
+                foreach ($candidates as $candidateid) {
+                    $candidate = $cache->get($candidateid);
+                    if ($candidate->contextid != $reference['contextid'] ||
+                        $candidate->component != $reference['component'] ||
+                        $candidate->filearea != $reference['filearea'] ||
+                        $candidate->itemid != $reference['itemid']) {
+                        continue;
+                    }
                     $candidateinfo = backup_controller_dbops::decode_backup_temp_info($candidate->info);
                     if ($candidateinfo->filename === $reference['filename']
                             and $candidateinfo->filepath === $reference['filepath']
@@ -5279,7 +5329,6 @@ class restore_process_file_aliases_queue extends restore_execution_step {
                 }
             }
         }
-        $rs->close();
     }
 
     /**

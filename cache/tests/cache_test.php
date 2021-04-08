@@ -999,8 +999,8 @@ class core_cache_testcase extends advanced_testcase {
 
         // OK data added, data invalidated, and invalidation time has been set.
         // Now we need to manually add back the data and adjust the invalidation time.
-        $hash = md5(cache_store::MODE_APPLICATION.'/phpunit/eventinvalidationtest/'.$CFG->wwwroot.'phpunit');
-        $timefile = $CFG->dataroot."/cache/cachestore_file/default_application/phpunit_eventinvalidationtest/las-cache/lastinvalidation-$hash.cache";
+        $timefile = $CFG->dataroot
+            . "/cache/cachestore_file/default_application/phpunit_eventinvalidationtest/las-cache/lastinvalidation.cache";
         // Make sure the file is correct.
         $this->assertTrue(file_exists($timefile));
         $timecont = serialize(cache::now(true) - 60); // Back 60sec in the past to force it to re-invalidate.
@@ -1008,7 +1008,8 @@ class core_cache_testcase extends advanced_testcase {
         file_put_contents($timefile, $timecont);
         $this->assertTrue(file_exists($timefile));
 
-        $datafile = $CFG->dataroot."/cache/cachestore_file/default_application/phpunit_eventinvalidationtest/tes-cache/testkey1-$hash.cache";
+        $datafile = $CFG->dataroot
+            . "/cache/cachestore_file/default_application/phpunit_eventinvalidationtest/tes-cache/testkey1.cache";
         $datacont = serialize("test data 1");
         make_writable_directory(dirname($datafile));
         file_put_contents($datafile, $datacont);

@@ -393,4 +393,36 @@ abstract class restore_qtype_plugin extends restore_plugin {
 
         return $contents;
     }
+
+    /**
+     * Return chunked sqlparams array from question_created ids.
+     *
+     * @return array|void
+     * @throws coding_exception
+     * @throws dml_exception
+     */
+    protected function get_sql_and_params_from_cache() {
+        global $DB;
+
+        $idcache = backup_muc_manager::get('question_created');
+        $cacheitems = $idcache->get_store()->find_all();
+
+        if (empty($cacheitems)) {
+            return;
+        }
+
+        $newitemids = array();
+        foreach ($cacheitems as $itemid) {
+            $record = $idcache->get($itemid);
+            $newitemids[] = $record['newitemid'];
+        }
+
+        $sqlparams = array();
+        $chunkedarray = array_chunk($newitemids, 8192);
+        foreach ($chunkedarray as $chunkedids) {
+            $sqlparams[] = $DB->get_in_or_equal($chunkedids);
+        }
+
+        return $sqlparams;
+    }
 }

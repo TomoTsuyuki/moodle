@@ -232,8 +232,8 @@ abstract class grouped_parser_processor extends simplified_parser_processor {
                 // are grouped near each other. eg; /question_bank/question_category/question/element. After keeping
                 // question_bank paths in the cache when we move to another area and the question_bank cache is not
                 // useful any longer.
-                $this->parentcache = array_slice($this->parentcache, 200, null, true);
-                $this->parentcacheavailablesize += 200;
+                $this->parentcache = array_slice($this->parentcache, 600, null, true);
+                $this->parentcacheavailablesize += 600;
             }
         }
         return $this->parentcache[$path];
