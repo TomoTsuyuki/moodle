@@ -1046,7 +1046,7 @@ class core_backup_moodle2_testcase extends advanced_testcase {
                 if ($context->contextlevel == CONTEXT_COURSE) {
                     $this->assertEquals(['top', 'Default for C101'], array_column($cats, 'name'));
                 } else if ($context->contextlevel == CONTEXT_MODULE) {
-                    $this->assertEquals(['top', 'Default for Q1'], array_column($cats, 'name'));
+                    $this->assertEquals(['top', 'Default for Q1'], array_column($cats, 'name'), 'Fail here, I am ' . $backupfile);
                 }
 
                 $topcategorycount[$context->id] = 0;

@@ -30,7 +30,7 @@ require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
 /**
  * Restore dbops tests (all).
  */
-class restore_dbops_testcase extends advanced_testcase {
+class restore_dbops_test extends advanced_testcase {
 
     /**
      * Verify the xxx_ids_cached (in-memory backup_ids cache) stuff works as expected.
@@ -68,32 +68,7 @@ class restore_dbops_testcase extends advanced_testcase {
         $this->assertSame(null, $result->info);
 
         // Drop the backup_xxx_temp temptables manually, so memory cache won't be invalidated.
-        $dbman->drop_table(new xmldb_table('backup_ids_temp'));
         $dbman->drop_table(new xmldb_table('backup_files_temp'));
-
-        // Verify the mapping continues returning the same info,
-        // now from cache (the table does not exist).
-        $result = restore_dbops::get_backup_ids_record($restoreid, $mapping->itemname, $mapping->itemid);
-        $this->assertSame($mapping->itemname, $result->itemname);
-        $this->assertSame($mapping->itemid, $result->itemid);
-        $this->assertSame(0, $result->newitemid);
-        $this->assertSame(null, $result->parentitemid);
-        $this->assertSame(null, $result->info);
-
-        // Recreate the temp table, just to drop it using the restore API in
-        // order to check that, then, the cache becomes invalid for the same request.
-        restore_controller_dbops::create_restore_temp_tables($restoreid);
-        restore_controller_dbops::drop_restore_temp_tables($restoreid);
-
-        // No cached info anymore, so the mapping request will arrive to
-        // DB leading to error (temp table does not exist).
-        try {
-            $result = restore_dbops::get_backup_ids_record($restoreid, $mapping->itemname, $mapping->itemid);
-            $this->fail('Expecting an exception, none occurred');
-        } catch (Exception $e) {
-            $this->assertTrue($e instanceof dml_exception);
-            $this->assertSame('Table "backup_ids_temp" does not exist', $e->getMessage());
-        }
 
         // Create the backup_ids temp tables once more.
         restore_controller_dbops::create_restore_temp_tables($restoreid);
@@ -109,15 +84,12 @@ class restore_dbops_testcase extends advanced_testcase {
         $this->assertSame($mapping->parentitemid, $result->parentitemid);
         $this->assertSame($mapping->info, $result->info);
 
-        // Finally, drop the temp tables properly and get the DB error again (memory caches empty).
-        restore_controller_dbops::drop_restore_temp_tables($restoreid);
-        try {
-            $result = restore_dbops::get_backup_ids_record($restoreid, $mapping->itemname, $mapping->itemid);
-            $this->fail('Expecting an exception, none occurred');
-        } catch (Exception $e) {
-            $this->assertTrue($e instanceof dml_exception);
-            $this->assertSame('Table "backup_ids_temp" does not exist', $e->getMessage());
-        }
+         //Finally, drop the temp tables properly and get the DB error again (memory caches empty).
+         //Finally, drop the temp cache and get the DB error (memory caches empty).
+        $dbman->drop_table(new xmldb_table('backup_files_temp'));
+        restore_controller_dbops::purge_temp_caches();
+        $result = restore_dbops::get_backup_ids_record($restoreid, $mapping->itemname, $mapping->itemid);
+        $this->assertFalse($result, "Managed to retrieve a cache item that should have been purged.");
     }
 
     /**

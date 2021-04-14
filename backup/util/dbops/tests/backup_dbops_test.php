@@ -134,20 +134,6 @@ class backup_dbops_testcase extends advanced_testcase {
             $this->assertEquals($e->errorcode, 'backup_controller_dbops_nonexisting');
         }
 
-        // backup_ids_temp table tests
-        // If, for any reason table exists, drop it
-        if ($dbman->table_exists('backup_ids_temp')) {
-            $dbman->drop_table(new xmldb_table('backup_ids_temp'));
-        }
-        // Check backup_ids_temp table doesn't exist
-        $this->assertFalse($dbman->table_exists('backup_ids_temp'));
-        // Create and check it exists
-        backup_controller_dbops::create_backup_ids_temp_table('testingid');
-        $this->assertTrue($dbman->table_exists('backup_ids_temp'));
-        // Drop and check it doesn't exists anymore
-        backup_controller_dbops::drop_backup_ids_temp_table('testingid');
-        $this->assertFalse($dbman->table_exists('backup_ids_temp'));
-
         // Test encoding/decoding of backup_ids_temp,backup_files_temp encode/decode functions.
         // We need to handle both objects and data elements.
         $object = new stdClass();

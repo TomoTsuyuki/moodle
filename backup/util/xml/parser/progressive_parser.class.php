@@ -76,6 +76,9 @@ class progressive_parser {
      */
     protected $progress;
 
+    protected static $instance;
+    protected $cachedir;
+
     public function __construct($case_folding = false) {
         $this->xml_parser = xml_parser_create('UTF-8');
         xml_parser_set_option($this->xml_parser, XML_OPTION_CASE_FOLDING, $case_folding);
@@ -170,7 +173,14 @@ class progressive_parser {
      * handling parser paths, see MDL-24381
      */
     public static function dirname($path) {
-        return str_replace('\\', '/', dirname($path));
+        if (empty(self::$instance)) {
+            self::$instance = new self;
+            self::$instance->cachedir = [];
+        }
+        if (empty(self::$instance->cachedir[$path])) {
+            self::$instance->cachedir[$path] = str_replace('\\', '/', dirname($path));
+        }
+        return self::$instance->cachedir[$path];
     }
 
 // Protected API starts here
