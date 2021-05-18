@@ -28,6 +28,7 @@ defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->dirroot . '/backup/converter/moodle1/lib.php');
+require_once($CFG->dirroot . '/backup/util/helper/muc_helper.class.php');
 
 
 class core_backup_moodle1_converter_testcase extends advanced_testcase {
@@ -112,6 +113,7 @@ class core_backup_moodle1_converter_testcase extends advanced_testcase {
             $converter->drop_stash_storage();
             throw new moodle1_convert_empty_storage_exception('rethrowing');
         }
+        $converter->drop_stash_storage();
     }
 
     public function test_stash_storage() {
