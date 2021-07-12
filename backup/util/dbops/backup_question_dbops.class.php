@@ -42,31 +42,35 @@ abstract class backup_question_dbops extends backup_dbops {
 
         // First step, annotate all the categories for the given context (course/module)
         // i.e. the whole context questions bank
-        $DB->execute("INSERT INTO {backup_ids_temp} (backupid, itemname, itemid)
-                      SELECT ?, 'question_category', id
-                        FROM {question_categories}
-                       WHERE contextid = ?", array($backupid, $contextid));
+        $qc = $DB->get_records_sql_menu("SELECT id, 1 FROM {question_categories} WHERE contextid = ?", [$contextid]);
+        backup_muc_manager::set_many($backupid, 'question_category', $qc);
 
         // Now, based in the annotated questions, annotate all the categories they
         // belong to (whole context question banks too)
         // First, get all the contexts we are going to save their question bank (no matter
         // where they are in the contexts hierarchy, transversals... whatever)
-        $contexts = $DB->get_fieldset_sql("SELECT DISTINCT qc2.contextid
-                                             FROM {question_categories} qc2
-                                             JOIN {question} q ON q.category = qc2.id
-                                             JOIN {backup_ids_temp} bi ON bi.itemid = q.id
-                                            WHERE bi.backupid = ?
-                                              AND bi.itemname = 'question'
-                                              AND qc2.contextid != ?", array($backupid, $contextid));
+        $questions = backup_muc_manager::get_allkeys($backupid, 'question');
+        if (empty($questions)) {
+            return;
+        }
+
+        list($sql, $params) = $DB->get_in_or_equal($questions);
+        $params = array_merge([$contextid], $params);
+        $contexts = $DB->get_fieldset_sql("
+            SELECT DISTINCT qc2.contextid
+              FROM {question_categories} qc2
+              JOIN {question} q ON q.category = qc2.id
+             WHERE qc2.contextid != ?
+               AND q.id $sql", $params);
         // And now, simply insert all the question categories (complete question bank)
         // for those contexts if we have found any
         if ($contexts) {
             list($contextssql, $contextparams) = $DB->get_in_or_equal($contexts);
-            $params = array_merge(array($backupid), $contextparams);
-            $DB->execute("INSERT INTO {backup_ids_temp} (backupid, itemname, itemid)
-                          SELECT ?, 'question_category', id
-                            FROM {question_categories}
-                           WHERE contextid $contextssql", $params);
+            $qc = $DB->get_records_sql_menu("
+                SELECT id, 1
+                  FROM {question_categories}
+                 WHERE contextid $contextssql", $contextparams);
+            backup_muc_manager::set_many($backupid, 'question_category', $qc);
         }
     }
 
@@ -74,7 +78,6 @@ abstract class backup_question_dbops extends backup_dbops {
      * Delete all the annotated questions present in backup_ids_temp
      */
     public static function delete_temp_questions($backupid) {
-        global $DB;
-        $DB->delete_records('backup_ids_temp', array('backupid' => $backupid, 'itemname' => 'question'));
+        backup_muc_manager::purge($backupid, 'question');
     }
 }

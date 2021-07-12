@@ -496,13 +496,8 @@ class moodle1_converter extends base_converter {
      * @return array
      */
     public function get_stash_names() {
-        global $DB;
-
-        $search = array(
-            'backupid' => $this->get_id(),
-        );
-
-        return array_keys($DB->get_records('backup_ids_temp', $search, '', 'itemname'));
+        $stores = backup_muc_manager::get_stores($this->get_id());
+        return array_keys($stores);
     }
 
     /**
@@ -512,14 +507,7 @@ class moodle1_converter extends base_converter {
      * @return array
      */
     public function get_stash_itemids($stashname) {
-        global $DB;
-
-        $search = array(
-            'backupid' => $this->get_id(),
-            'itemname' => $stashname
-        );
-
-        return array_keys($DB->get_records('backup_ids_temp', $search, '', 'itemid'));
+        return backup_muc_manager::get_allkeys($this->get_id(), $stashname);
     }
 
     /**
