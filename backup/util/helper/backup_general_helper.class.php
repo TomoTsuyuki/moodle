@@ -335,4 +335,47 @@ abstract class backup_general_helper extends backup_helper {
 
         return backup::FORMAT_UNKNOWN;
     }
+
+    /**
+     * Return array of [$sql, $params] from question_created ids, use for restoring queries with new itemid.
+     *
+     * @param string $restoreid
+     * @param string $itemname
+     * @param string|null $extraitem
+     * @return array|void
+     * @throws coding_exception
+     * @throws dml_exception
+     */
+    public static function get_sql_and_params_from_cache(string $restoreid, string $itemname, ?string $extraitem = null) {
+        global $DB;
+
+        $idcache = backup_muc_manager::get($restoreid, $itemname);
+        $cacheitems = backup_muc_manager::get_allkeys($restoreid, $itemname);
+
+        if (empty($cacheitems)) {
+            return;
+        }
+
+        $newitemids = array();
+        $extraitems = array();
+        foreach ($cacheitems as $itemid) {
+            $record = $idcache->get($itemid);
+            $newitemids[] = $record['newitemid'];
+            if ($extraitem && isset($record[$extraitem])) {
+                $extraitems[$record['newitemid']] = $record[$extraitem];
+            }
+        }
+
+        $sqlparams = array();
+        $chunkedarray = array_chunk($newitemids, 8192);
+        foreach ($chunkedarray as $chunkedids) {
+            $sqlparams[] = $DB->get_in_or_equal($chunkedids);
+        }
+
+        if ($extraitem && $extraitems) {
+            $sqlparams['extraitems'] = $extraitems;
+        }
+
+        return $sqlparams;
+    }
 }

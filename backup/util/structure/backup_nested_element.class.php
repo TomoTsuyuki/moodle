@@ -33,13 +33,21 @@ class backup_nested_element extends base_nested_element implements processable {
     protected $table;     // Table (without prefix) to fetch records from
     protected $tablesortby; // The field to sort by when using the table methods
     protected $sql;       // Raw SQL to fetch records from
+    /** @var string Raw SQL to use with cache. */
+    protected $sqltousewithcache;
     protected $params;    // Unprocessed params as specified in the set_source() call
     protected $procparams;// Processed (path resolved) params array
+    /** @var string Params using with cache. */
+    protected $paramstousewithcache;
     protected $aliases;   // Define DB->final element aliases
     protected $fileannotations;   // array of file areas to be searched by file annotations
     protected $counter;   // Number of instances of this element that have been processed
     protected $results;  // Logs the results we encounter during the process.
     protected $logs;     // Some log messages that could be retrieved later.
+    /** @var string The backupid to use in finding the cache. Not called backupid because clashes with file_nested_element field. */
+    protected $cacheparambackupid;
+    /** @var string The name of the backup ids cache used for the query. */
+    protected $cachename;
 
     /**
      * Constructor - instantiates one backup_nested_element, specifying its basic info.
@@ -54,13 +62,17 @@ class backup_nested_element extends base_nested_element implements processable {
         $this->table     = null;
         $this->tablesortby = null;
         $this->sql       = null;
+        $this->sqltousewithcache      = null;
         $this->params    = null;
         $this->procparams= null;
+        $this->paramstousewithcache = null;
         $this->aliases   = array();
         $this->fileannotations = array();
         $this->counter   = 0;
         $this->results  = array();
         $this->logs     = array();
+        $this->cachename = null;
+        $this->cacheparambackupid = null;
     }
 
     /**
@@ -214,6 +226,38 @@ class backup_nested_element extends base_nested_element implements processable {
         $this->procparams = $this->convert_sql_params($params);
     }
 
+    /**
+     * Set sql statements and some params.
+     *
+     * @param string $sql Raw SQL to fetch records from.
+     *                    The sql needs to be contained "*SQL*" to determine by cached ids.
+     *                    "*SQL*" should be put in WHERE clause immediately after key field name. (e.g. WHERE k.id *SQL*)
+     * @param array $params Array of parameters.
+     * @param int $backupid Backup id.
+     * @param string $cachename The name of the backup ids cache used for the query.
+     * @throws base_element_struct_exception
+     * @return void
+     */
+    public function set_source_sql_using_backup_ids($sql, array $params, $backupid, $cachename): void {
+
+        // Only elements having final elements can set source.
+        $this->sqltousewithcache = $sql;
+        $this->paramstousewithcache = $this->convert_sql_params($params);
+
+        $this->cacheparambackupid = $backupid;
+        $this->cachename = $cachename;
+    }
+
+    /**
+     * Set source cache name to use "source_cache".
+     *
+     * @param string $cachename The name of the backup ids cache used for the query.
+     * @return void
+     */
+    public function set_source_cache($cachename): void {
+        $this->cachename = $cachename;
+    }
+
     public function set_source_alias($dbname, $finalelementname) {
         // Get final element
         $finalelement = $this->get_final_element($finalelementname);
@@ -272,8 +316,78 @@ class backup_nested_element extends base_nested_element implements processable {
         return $this->sql;
     }
 
+    /**
+     * Get sql statement and params using cached ids.
+     *
+     * @param int $backupid Backup id.
+     * @return array|null[]|null
+     * @throws coding_exception
+     * @throws dml_exception
+     */
+    public function get_source_sql_using_backup_ids($backupid) {
+        global $DB;
+
+        // A cache source will have cachename set but not cacheparambackupid.
+        if (!$this->cacheparambackupid) {
+            return null;
+        }
+
+        $content = backup_muc_manager::get_allkeys($backupid, $this->cachename);
+
+        if (empty($content)) {
+            // No data to match => Empty result set.
+            return [null, null];
+        } else {
+            // Cache content can be object or just array of values.
+            // Convert format of content to simple array of ids.
+            if (is_object($content[0])) {
+                $ids = array_map(function($item) {
+                    return $item->itemid;
+                }, $content);
+            } else {
+                $ids = array_values($content);
+            }
+            list($sql, $sqlparams) = $DB->get_in_or_equal($ids);
+        }
+        // Replace "*SQL*" by cached ids.
+        // The "*SQL*" should be set from the function set_source_sql_using_backup_ids.
+        $sql = str_replace('*SQL*', $sql, $this->sqltousewithcache);
+        $params = array_merge($this->paramstousewithcache, $sqlparams);
+        return [$sql, $params];
+    }
+
     public function get_counter() {
         return $this->counter;
+    }
+
+    /**
+     * Get array of id from cachename, "source_cache".
+     *
+     * @param int $backupid Backup id.
+     * @return array|StdClass[]|null Array of object with id
+     */
+    public function get_source_cache($backupid) {
+        if (!$this->cachename || !is_null($this->sqltousewithcache)) {
+            return null;
+        }
+
+        $content = backup_muc_manager::get_allkeys($backupid, $this->cachename);
+        if (empty($content)) {
+            // Something wrong with cache.
+            throw new \Exception('error');
+            return null;
+        } else if (is_object($content[0])) {
+            // Content is already an array of object, so simply return $content.
+            return $content;
+        } else {
+            sort ($content);
+            // Create a new array of object with id.
+            return array_map(function ($id) {
+                $temp = new StdClass();
+                $temp->id = $id;
+                return $temp;
+            }, $content);
+        }
     }
 
     /**

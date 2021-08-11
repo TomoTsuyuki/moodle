@@ -393,4 +393,5 @@ abstract class restore_qtype_plugin extends restore_plugin {
 
         return $contents;
     }
+
 }

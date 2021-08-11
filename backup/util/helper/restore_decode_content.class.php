@@ -70,21 +70,24 @@ class restore_decode_content implements processable {
 
         // Get the iterator of contents
         $it = $this->get_iterator();
-        foreach ($it as $itrow) {               // Iterate over rows
-            $itrowarr   = (array)$itrow;        // Array-ize for clean access
-            $rowchanged = false;                // To track changes in the row
-            foreach ($this->fields as $field) { // Iterate for each field
-                $content = $this->preprocess_field($itrowarr[$field]);     // Apply potential pre-transformations
+        foreach ($it as $itrow) {               // Iterate over rows.
+            $itrowarr   = (array)$itrow;        // Array-ize for clean access.
+            $rowchanged = false;                // To track changes in the row.
+            foreach ($this->fields as $field) { // Iterate for each field.
+                $content = $this->preprocess_field($itrowarr[$field]);     // Apply potential pre-transformations.
                 if ($result = $processor->decode_content($content)) {
-                    $itrowarr[$field] = $this->postprocess_field($result); // Apply potential post-transformations
+                    $itrowarr[$field] = $this->postprocess_field($result); // Apply potential post-transformations.
                     $rowchanged = true;
                 }
             }
-            if ($rowchanged) { // Change detected, perform update in the row
+            if ($rowchanged) { // Change detected, perform update in the row.
                 $this->update_iterator_row($itrowarr);
             }
         }
-        $it->close(); // Always close the iterator at the end
+        // Close the iterator if the iterator is empty or not to close the recordsets.
+        if (!empty($it)) {
+            $it->close();
+        }
     }
 
 // Protected API starts here
@@ -92,15 +95,30 @@ class restore_decode_content implements processable {
     protected function get_iterator() {
         global $DB;
 
-        // Build the SQL dynamically here
-        $fieldslist = 't.' . implode(', t.', $this->fields);
-        $sql = "SELECT t.id, $fieldslist
-                  FROM {" . $this->tablename . "} t
-                  JOIN {backup_ids_temp} b ON b.newitemid = t.id
-                 WHERE b.backupid = ?
-                   AND b.itemname = ?";
-        $params = array($this->restoreid, $this->mapping);
-        return ($DB->get_recordset_sql($sql, $params));
+        $sqlparams = backup_general_helper::get_sql_and_params_from_cache($this->restoreid, $this->mapping);
+
+        if (empty($sqlparams)) {
+            $sql = " < 0";
+            $params = [];
+            $sqlparams[] = [$sql, $params];
+        }
+
+        $result = [];
+        foreach ($sqlparams as $sqlparam) {
+            list($sql, $params) = $sqlparam;
+
+            // Build the SQL dynamically here.
+            $fieldslist = 't.' . implode(', t.', $this->fields);
+            $sql = "SELECT t.id, $fieldslist
+                      FROM {" . $this->tablename . "} t
+                     WHERE t.id $sql";
+            $records = $DB->get_recordset_sql($sql, $params);
+            if (is_array($records)) {
+                $result = array_merge($result, $records);
+            }
+        }
+
+        return $result;
     }
 
     protected function update_iterator_row($row) {
