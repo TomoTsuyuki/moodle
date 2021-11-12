@@ -2168,9 +2168,11 @@ class mod_forum_external extends external_api {
      * @param   int $cmid
      * @param   string $sortby
      * @param   string $sortdirection
+     * @param   int $groupid
      * @return  array
      */
-    public static function get_discussion_posts_by_userid(int $userid = 0, int $cmid, ?string $sortby, ?string $sortdirection) {
+    public static function get_discussion_posts_by_userid(int $userid, int $cmid, ?string $sortby, ?string $sortdirection,
+            int $groupid = 0) {
         global $USER, $DB;
         // Validate the parameter.
         $params = self::validate_parameters(self::get_discussion_posts_by_userid_parameters(), [
@@ -2178,6 +2180,7 @@ class mod_forum_external extends external_api {
                 'cmid' => $cmid,
                 'sortby' => $sortby,
                 'sortdirection' => $sortdirection,
+                'groupid' => $groupid,
         ]);
         $warnings = [];
 
@@ -2211,14 +2214,26 @@ class mod_forum_external extends external_api {
         $capabilitymanager = $managerfactory->get_capability_manager($forum);
 
         $discussionsummariesvault = $vaultfactory->get_discussions_in_forum_vault();
-        $discussionsummaries = $discussionsummariesvault->get_from_forum_id(
-            $forum->get_id(),
-            true,
-            null,
-            $discussionsummariesvault::SORTORDER_CREATED_ASC,
-            0,
-            0
-        );
+        if (empty($groupid)) {
+            $discussionsummaries = $discussionsummariesvault->get_from_forum_id(
+                    $forum->get_id(),
+                    true,
+                    null,
+                    $discussionsummariesvault::SORTORDER_CREATED_ASC,
+                    0,
+                    0
+            );
+        } else {
+            $discussionsummaries = $discussionsummariesvault->get_from_forum_id_and_group_id(
+                    $forum->get_id(),
+                    [$groupid],
+                    true,
+                    null,
+                    $discussionsummariesvault::SORTORDER_CREATED_ASC,
+                    0,
+                    0
+            );
+        }
 
         $postvault = $vaultfactory->get_post_vault();
 
@@ -2228,6 +2243,9 @@ class mod_forum_external extends external_api {
         $builtdiscussions = [];
         foreach ($discussionsummaries as $discussionsummary) {
             $discussion = $discussionsummary->get_discussion();
+            if (!$capabilitymanager->can_view_discussion($USER, $discussion)) {
+                continue;
+            }
             $posts = $postvault->get_posts_in_discussion_for_user_id(
                     $discussion->get_id(),
                     $user->id,
@@ -2287,7 +2305,9 @@ class mod_forum_external extends external_api {
                 'sortby' => new external_value(
                         PARAM_ALPHA, 'Sort by this element: id, created or modified', VALUE_DEFAULT, 'created'),
                 'sortdirection' => new external_value(
-                        PARAM_ALPHA, 'Sort direction: ASC or DESC', VALUE_DEFAULT, 'DESC')
+                        PARAM_ALPHA, 'Sort direction: ASC or DESC', VALUE_DEFAULT, 'DESC'),
+                'groupid' => new external_value(
+                        PARAM_INT, 'The ID of the group of which to fetch discussions.', VALUE_DEFAULT, 0),
         ]);
     }
 
