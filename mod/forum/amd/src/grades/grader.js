@@ -37,15 +37,16 @@ const templateNames = {
  *
  * @param {Number} cmid
  * @param {Bool} experimentalDisplayMode
+ * @param {Number} groupid
  * @return {Function}
  */
-const getContentForUserIdFunction = (cmid, experimentalDisplayMode) => (userid) => {
+const getContentForUserIdFunction = (cmid, experimentalDisplayMode, groupid) => (userid) => {
     /**
      * Given the parent function is called with the second param set execute the partially executed function.
      *
      * @param {Number} userid
      */
-    return Repository.getDiscussionByUserID(userid, cmid)
+    return Repository.getDiscussionByUserID(userid, cmid, 'modified', 'DESC', groupid)
         .then(context => {
             // Rebuild the returned data for the template.
             context.discussions = context.discussions.map(discussionPostMapper);
@@ -131,7 +132,7 @@ const launchWholeForumGrading = async(rootNode, {
 
     await Grader.launch(
         getUsersForCmidFunction(data.cmid, groupID),
-        getContentForUserIdFunction(data.cmid, data.experimentalDisplayMode == "1"),
+        getContentForUserIdFunction(data.cmid, data.experimentalDisplayMode == "1", groupID),
         gradingPanelFunctions.getter,
         gradingPanelFunctions.setter,
         {
