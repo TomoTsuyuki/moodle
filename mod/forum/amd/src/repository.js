@@ -118,9 +118,10 @@ define(['core/ajax'], function(Ajax) {
      * @param {number} cmid
      * @param {string} sortby
      * @param {string} sortdirection
+     * @param {number} groupid
      * @return {*|Promise}
      */
-    var getDiscussionByUserID = function(userid, cmid, sortby = 'modified', sortdirection = 'DESC') {
+    var getDiscussionByUserID = function(userid, cmid, sortby = 'modified', sortdirection = 'DESC', groupid = 0) {
         var request = {
             methodname: 'mod_forum_get_discussion_posts_by_userid',
             args: {
@@ -128,6 +129,7 @@ define(['core/ajax'], function(Ajax) {
                 cmid: cmid,
                 sortby: sortby,
                 sortdirection: sortdirection,
+                groupid: groupid,
             },
         };
         return Ajax.call([request])[0];
