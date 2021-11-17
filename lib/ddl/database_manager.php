@@ -1070,8 +1070,7 @@ class database_manager {
                                 }
 
                             } else if ($dbtype == XMLDB_TYPE_BINARY) {
-                                // Ignore binary types.
-                                continue;
+                                // No length check for binary type.
 
                             } else if ($dbtype == XMLDB_TYPE_TIMESTAMP) {
                                 $errors[$tablename][] = "column '$fieldname' is a timestamp, this type is not supported ($dbfield->meta_type)";
