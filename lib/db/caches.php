@@ -532,4 +532,13 @@ $definitions = array(
         'staticacceleration' => true,
         'ttl' => 1800,
     ],
+
+    // Backup temporary cache.
+    'backup' => [
+        'mode' => cache_store::MODE_REQUEST,
+        'simplekeys' => true,
+        'simpledata' => true,
+        'requireidentifiers' => ['backupid', 'itemname'],
+        'maxsize' => 1048576
+    ],
 );

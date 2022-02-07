@@ -152,4 +152,30 @@ class cachestore_static_test extends cachestore_tests {
         $this->assertEquals($obj, $resunser); // Ok ig-unserialized (equal
         $this->assertNotSame($obj, $resunser);// but different objects, obviously).
     }
+
+    /**
+     * Test for multiple identifier.
+     */
+    public function test_multiple_identifier() {
+        $defid = 'phpunit/testmultipleindentifier';
+        $config = cache_config_testing::instance();
+        $config->phpunit_add_definition($defid, array(
+                'mode' => cache_store::MODE_REQUEST,
+                'component' => 'phpunit',
+                'area' => 'testmultipleindentifier',
+                'requireidentifiers' => ['id1', 'id2']
+        ));
+
+        // Set different identifier and different values.
+        $cache1 = \cache::make('phpunit', 'testmultipleindentifier', ['id1' => 1, 'id2' => 2]);
+        $cache1->set('key1', 'value1');
+        $cache1->set('key2', 'value2');
+        $cache2 = \cache::make('phpunit', 'testmultipleindentifier', ['id1' => 2, 'id2' => 1]);
+        $cache2->set('key1', 'value2');
+        $cache2->set('key2', 'value1');
+
+        // Make sure the cache values are different.
+        $this->assertNotEquals($cache1->get('key1'), $cache2->get('key1'));
+        $this->assertNotEquals($cache1->get('key2'), $cache2->get('key2'));
+    }
 }

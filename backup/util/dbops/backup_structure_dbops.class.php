@@ -106,6 +106,30 @@ abstract class backup_structure_dbops extends backup_dbops {
     }
 
     /**
+     * Insert records to temporary backup table.
+     *
+     * @param int $backupid Backup ID
+     * @param string $itemname Item name
+     * @param array $itemid Array of Item id
+     */
+    public static function insert_backup_ids_records($backupid, $itemname, array $itemids) {
+        global $DB;
+        $records = [];
+        foreach ($itemids as $itemid) {
+            // We need to do some magic with scales (that are stored in negative way).
+            if ($itemname == 'scale') {
+                $itemid = -($itemid);
+            }
+            // Now, we skip any annotation with negatives/zero/nulls, ids table only stores true id (always > 0).
+            if ($itemid <= 0 || is_null($itemid)) {
+                continue;
+            }
+            $records[] = ['backupid' => $backupid, 'itemname' => $itemname, 'itemid' => $itemid];
+        }
+        $DB->insert_records('backup_ids_temp', $records);
+    }
+
+    /**
      * Adds backup id database record for all files in the given file area.
      *
      * @param string $backupid Backup ID

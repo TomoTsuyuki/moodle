@@ -111,6 +111,7 @@ class restore_qtype_essay_plugin extends restore_qtype_plugin {
                        AND bi.itemname = ?
                 ", array('essay', $this->get_restoreid(), 'question_created'));
 
+        $insertrecords = array();
         foreach ($essayswithoutoptions as $q) {
             $defaultoptions = new stdClass();
             $defaultoptions->questionid = $q->id;
@@ -125,7 +126,8 @@ class restore_qtype_essay_plugin extends restore_qtype_plugin {
             $defaultoptions->graderinfoformat = FORMAT_HTML;
             $defaultoptions->responsetemplate = '';
             $defaultoptions->responsetemplateformat = FORMAT_HTML;
-            $DB->insert_record('qtype_essay_options', $defaultoptions);
+            $insertrecords[] = $defaultoptions;
         }
+        $DB->insert_records('qtype_essay_options', $insertrecords);
     }
 }

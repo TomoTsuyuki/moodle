@@ -138,6 +138,8 @@ abstract class backup_controller_dbops extends backup_dbops {
 
         $dbman->create_temp_table($xmldb_table); // And create it
 
+        // Also clear caches when creating new temp tables.
+        self::purge_temp_caches();
     }
 
     public static function create_backup_files_temp_table($backupid) {
@@ -170,6 +172,7 @@ abstract class backup_controller_dbops extends backup_dbops {
             $table = new xmldb_table($targettablename);
             $dbman->drop_table($table); // And drop it
         }
+        self::purge_temp_caches();
     }
 
     /**
@@ -710,5 +713,12 @@ abstract class backup_controller_dbops extends backup_dbops {
         $progress = array('status' => $status, 'progress' => $progress, 'backupid' => $backupid, 'operation' => $operation);
 
         return $progress;
+    }
+
+    /**
+     * Purge temporary cache.
+     */
+    public static function purge_temp_caches(): void {
+        backup_data_manager::reset();
     }
 }

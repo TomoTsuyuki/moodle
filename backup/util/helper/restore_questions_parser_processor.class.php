@@ -59,9 +59,9 @@ class restore_questions_parser_processor extends grouped_parser_processor {
 
         // Prepare question record
         } else if ($data['path'] == '/question_categories/question_category/questions/question') {
-            $info = (object)$data['tags'];
+            $info = (object)array_intersect_key($data['tags'], array_flip(['id', 'stamp', 'version', 'qtype']));
             $itemname = 'question';
-            $itemid   = $info->id;
+            $itemid   = $data['tags']['id'];
             $parentitemid = $this->lastcatid;
 
         // Not question_category nor question, impossible. Throw exception.

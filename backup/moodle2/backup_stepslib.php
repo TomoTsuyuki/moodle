@@ -39,6 +39,7 @@ class create_and_clean_temp_stuff extends backup_execution_step {
         backup_helper::clear_backup_dir($this->get_backupid(), $progress);           // Empty temp dir, just in case
         backup_controller_dbops::drop_backup_ids_temp_table($this->get_backupid()); // Drop ids temp table
         backup_controller_dbops::create_backup_ids_temp_table($this->get_backupid()); // Create ids temp table
+        backup_controller_dbops::purge_temp_caches();
         $progress->end_progress();
     }
 }
@@ -56,6 +57,7 @@ class drop_and_clean_temp_stuff extends backup_execution_step {
         global $CFG;
 
         backup_controller_dbops::drop_backup_ids_temp_table($this->get_backupid()); // Drop ids temp table
+        backup_controller_dbops::purge_temp_caches();
         // Delete temp dir conditionally:
         // 1) If $CFG->keeptempdirectoriesonbackup is not enabled
         // 2) If backup temp dir deletion has been marked to be avoided
@@ -2215,15 +2217,26 @@ class backup_store_backup_file extends backup_execution_step {
 class backup_activity_grade_items_to_ids extends backup_execution_step {
 
     protected function define_execution() {
-
+        global $DB;
+        $backupid = $this->get_backupid();
         // Fetch all activity grade items
-        if ($items = grade_item::fetch_all(array(
-                         'itemtype' => 'mod', 'itemmodule' => $this->task->get_modulename(),
-                         'iteminstance' => $this->task->get_activityid(), 'courseid' => $this->task->get_courseid()))) {
-            // Annotate them in backup_ids
-            foreach ($items as $item) {
-                backup_structure_dbops::insert_backup_ids_record($this->get_backupid(), 'grade_item', $item->id);
-            }
+        $gradeitemcondition = [
+            'itemtype' => 'mod', 'itemmodule' => $this->task->get_modulename(),
+            'iteminstance' => $this->task->get_activityid(), 'courseid' => $this->task->get_courseid()];
+        if ($items = grade_item::fetch_all($gradeitemcondition)) {
+            // Delete before insert.
+            $conditiongradeitem = "itemtype = 'mod' AND itemmodule = :imodule AND iteminstance = :iinstance AND courseid = :cid";
+            $itemidsubquery = "SELECT id FROM {grade_items} WHERE $conditiongradeitem";
+            $sectionsql = "backupid = :bid AND itemname = :iname AND itemid IN ($itemidsubquery)";
+            $DB->delete_records_select('backup_ids_temp', $sectionsql, array_merge([
+                    'imodule' => $this->task->get_modulename(),
+                    'iinstance' => $this->task->get_activityid(),
+                    'cid' => $this->task->get_courseid(),
+                    'bid' => $backupid,
+                    'iname' => 'grade_item'
+            ], $gradeitemcondition));
+            $itemids = array_column($items, 'id');
+            backup_structure_dbops::insert_backup_ids_records($backupid, 'grade_item', $itemids);
         }
     }
 }
@@ -2277,20 +2290,25 @@ class backup_annotate_course_groups_and_groupings extends backup_execution_step 
     protected function define_execution() {
         global $DB;
 
-        // Get all the course groups
-        if ($groups = $DB->get_records('groups', array(
-                'courseid' => $this->task->get_courseid()))) {
-            foreach ($groups as $group) {
-                backup_structure_dbops::insert_backup_ids_record($this->get_backupid(), 'group', $group->id);
-            }
+        $backupid = $this->get_backupid();
+        $courseid = $this->task->get_courseid();
+
+        // Delete before insert.
+        $sectionsql = "backupid = :bid AND itemname = :iname AND itemid IN (SELECT id FROM {groups} WHERE courseid = :cid)";
+        $DB->delete_records_select('backup_ids_temp', $sectionsql, ['bid' => $backupid, 'iname' => 'group', 'cid' => $courseid]);
+        // Get all the course groups.
+        if ($groups = $DB->get_records('groups', ['courseid' => $courseid], '', 'id')) {
+            $groupids = array_column($groups, 'id');
+            backup_structure_dbops::insert_backup_ids_records($backupid, 'group', $groupids);
         }
 
-        // Get all the course groupings
-        if ($groupings = $DB->get_records('groupings', array(
-                'courseid' => $this->task->get_courseid()))) {
-            foreach ($groupings as $grouping) {
-                backup_structure_dbops::insert_backup_ids_record($this->get_backupid(), 'grouping', $grouping->id);
-            }
+        // Delete before insert.
+        $sectionsql = "backupid = :bid AND itemname = :iname AND itemid IN (SELECT id FROM {groupings} WHERE courseid = :cid)";
+        $DB->delete_records_select('backup_ids_temp', $sectionsql, ['bid' => $backupid, 'iname' => 'grouping', 'cid' => $courseid]);
+        // Get all the course groupings.
+        if ($groupings = $DB->get_records('groupings', ['courseid' => $courseid], '', 'id')) {
+            $groupingids = array_column($groupings, 'id');
+            backup_structure_dbops::insert_backup_ids_records($backupid, 'grouping', $groupingids);
         }
     }
 }
@@ -2302,19 +2320,22 @@ class backup_annotate_groups_from_groupings extends backup_execution_step {
 
     protected function define_execution() {
         global $DB;
-
-        // Fetch all the annotated groupings
-        if ($groupings = $DB->get_records('backup_ids_temp', array(
-                'backupid' => $this->get_backupid(), 'itemname' => 'grouping'))) {
+        $backupid = $this->get_backupid();
+        // Delete before insert.
+        $groupingsubquery = "SELECT itemid FROM {backup_ids_temp} WHERE backupid = :bid2 AND itemname = 'grouping'";
+        $ggsubquery = "SELECT id FROM {groupings_groups} WHERE groupingid IN ($groupingsubquery)";
+        $sectionsql = "backupid = :bid1 AND itemname = :iname AND itemid IN ($ggsubquery)";
+        $DB->delete_records_select('backup_ids_temp', $sectionsql, ['bid1' => $backupid, 'bid2' => $backupid, 'iname' => 'group']);
+        $groupids = [];
+        // Fetch all the annotated groupings.
+        if ($groupings = $DB->get_records('backup_ids_temp', ['backupid' => $backupid, 'itemname' => 'grouping'])) {
             foreach ($groupings as $grouping) {
-                if ($groups = $DB->get_records('groupings_groups', array(
-                        'groupingid' => $grouping->itemid))) {
-                    foreach ($groups as $group) {
-                        backup_structure_dbops::insert_backup_ids_record($this->get_backupid(), 'group', $group->groupid);
-                    }
+                if ($groups = $DB->get_records('groupings_groups', ['groupingid' => $grouping->itemid], '', 'groupid')) {
+                    $groupids = array_merge($groupids, array_column($groups, 'groupid'));
                 }
             }
         }
+        backup_structure_dbops::insert_backup_ids_records($backupid, 'group', $groupids);
     }
 }
 
@@ -2325,18 +2346,25 @@ class backup_annotate_scales_from_outcomes extends backup_execution_step {
 
     protected function define_execution() {
         global $DB;
-
-        // Fetch all the annotated outcomes
-        if ($outcomes = $DB->get_records('backup_ids_temp', array(
-                'backupid' => $this->get_backupid(), 'itemname' => 'outcome'))) {
+        $backupid = $this->get_backupid();
+        // Delete before insert.
+        $groupingsubquery = "SELECT itemid FROM {backup_ids_temp} WHERE backupid = :bid1 AND itemname = 'outcome'";
+        $ggsubquery = "SELECT id FROM {grade_outcomes} WHERE id IN ($groupingsubquery)";
+        $sectionsql = "backupid = :bid2 AND itemname = :iname AND itemid IN ($ggsubquery)";
+        $params = ['bid1' => $backupid, 'bid2' => $backupid, 'iname' => 'scalefinal'];
+        $DB->delete_records_select('backup_ids_temp', $sectionsql, $params);
+        $scaleids = [];
+        // Fetch all the annotated outcomes.
+        if ($outcomes = $DB->get_records('backup_ids_temp', ['backupid' => $backupid, 'itemname' => 'outcome'])) {
             foreach ($outcomes as $outcome) {
-                if ($scale = $DB->get_record('grade_outcomes', array(
-                        'id' => $outcome->itemid))) {
+                if ($scale = $DB->get_record('grade_outcomes', ['id' => $outcome->itemid])) {
                     // Annotate as scalefinal because it's > 0
-                    backup_structure_dbops::insert_backup_ids_record($this->get_backupid(), 'scalefinal', $scale->scaleid);
+                    $scaleids[] = $scale->scaleid;
                 }
             }
         }
+        // Annotate as scalefinal because it's > 0.
+        backup_structure_dbops::insert_backup_ids_records($this->get_backupid(), 'scalefinal', $scaleids);
     }
 }
 

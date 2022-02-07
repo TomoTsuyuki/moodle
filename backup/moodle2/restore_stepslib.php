@@ -33,8 +33,9 @@ defined('MOODLE_INTERNAL') || die();
 class restore_create_and_clean_temp_stuff extends restore_execution_step {
 
     protected function define_execution() {
-        $exists = restore_controller_dbops::create_restore_temp_tables($this->get_restoreid()); // temp tables conditionally
-        // If the table already exists, it's because restore_prechecks have been executed in the same
+        $exists = !empty(backup_data_manager::get_stores());
+        restore_controller_dbops::create_restore_temp_tables($this->get_restoreid());
+        // If the cache already exists, it's because restore_prechecks have been executed in the same
         // request (without problems) and it already contains a bunch of preloaded information (users...)
         // that we aren't going to execute again
         if ($exists) { // Inform plan about preloaded information
@@ -64,6 +65,7 @@ class restore_drop_and_clean_temp_stuff extends restore_execution_step {
     protected function define_execution() {
         global $CFG;
         restore_controller_dbops::drop_restore_temp_tables($this->get_restoreid()); // Drop ids temp table
+        restore_controller_dbops::purge_temp_caches();
         if (empty($CFG->keeptempdirectoriesonbackup)) { // Conditionally
             $progress = $this->task->get_progress();
             $progress->start_progress('Deleting backup dir');
@@ -5883,13 +5885,15 @@ trait restore_questions_attempt_data_trait {
                 $this->newquestionids[$data->questionattemptid],
                 $data->sequencenumber, $response);
 
+        $rows = [];
         foreach ($response as $name => $value) {
             $row = new stdClass();
             $row->attemptstepid = $newitemid;
             $row->name = $name;
             $row->value = $value;
-            $DB->insert_record('question_attempt_step_data', $row, false);
+            $rows[] = $row;
         }
+        $DB->insert_records('question_attempt_step_data', $rows);
     }
 
     /**

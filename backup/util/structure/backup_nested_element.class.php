@@ -40,6 +40,10 @@ class backup_nested_element extends base_nested_element implements processable {
     protected $counter;   // Number of instances of this element that have been processed
     protected $results;  // Logs the results we encounter during the process.
     protected $logs;     // Some log messages that could be retrieved later.
+    /** @var string The backupid to use in finding the cache. Not called backupid because clashes with file_nested_element field. */
+    protected $cacheparambackupid;
+    /** @var string The name of the backup ids cache used for the query. */
+    protected $cachename;
 
     /**
      * Constructor - instantiates one backup_nested_element, specifying its basic info.
@@ -61,6 +65,8 @@ class backup_nested_element extends base_nested_element implements processable {
         $this->counter   = 0;
         $this->results  = array();
         $this->logs     = array();
+        $this->cachename = null;
+        $this->cacheparambackupid = null;
     }
 
     /**

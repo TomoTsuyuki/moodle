@@ -206,7 +206,16 @@ class cachestore_static extends static_data_store implements cache_is_key_aware,
      */
     public function initialise(cache_definition $definition) {
         $keyarray = $definition->generate_multi_key_parts();
-        $this->storeid = $keyarray['mode'].'/'.$keyarray['component'].'/'.$keyarray['area'].'/'.$keyarray['siteidentifier'];
+        $this->storeid = sprintf(
+            "%s/%s/%s/%s",
+            $keyarray['mode'],
+            $keyarray['component'],
+            $keyarray['area'],
+            $keyarray['siteidentifier']
+        );
+        if (isset($keyarray['identifiers'])) {
+            $this->storeid .= "/{$keyarray['identifiers']}";
+        }
         $this->store = &self::register_store_id($this->storeid);
         $maxsize = $definition->get_maxsize();
         $this->simpledata = $definition->uses_simple_data();

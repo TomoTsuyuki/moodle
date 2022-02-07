@@ -108,7 +108,10 @@ class restore_qtype_multianswer_plugin extends restore_qtype_plugin {
             }
 
             foreach ($sequencearr as $key => $question) {
-                $sequencearr[$key] = $this->get_mappingid('question', $question);
+                $questionmappingid = $this->get_mappingid('question', $question);
+                if (!empty($questionmappingid)) {
+                    $sequencearr[$key] = $questionmappingid;
+                }
             }
             $sequence = implode(',', $sequencearr);
             $DB->set_field('question_multianswer', 'sequence', $sequence,
@@ -126,7 +129,7 @@ class restore_qtype_multianswer_plugin extends restore_qtype_plugin {
                                     $answerregs[ANSWER_REGEX_ANSWER_TYPE_MULTICHOICE] !== '') {
                                 $wrapped->options->shuffleanswers = 0;
                                 $DB->set_field_select('qtype_multichoice_options', 'shuffleanswers', '0', "id =:select",
-                                    array('select' => $wrapped->options->id) );
+                                    ['select' => $wrapped->options->id]);
                             }
                         }
                     }
