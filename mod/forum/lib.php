@@ -184,6 +184,10 @@ function forum_update_instance($forum, $mform) {
         $forum->assesstimefinish = 0;
     }
 
+    if (empty($forum->usecoursefullname)) {
+        $forum->usecoursefullname = 0;
+    }
+
     $oldforum = $DB->get_record('forum', array('id'=>$forum->id));
 
     // MDL-3942 - if the aggregation type or scale (i.e. max grade) changes then recalculate the grades for the entire forum
