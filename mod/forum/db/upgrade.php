@@ -290,5 +290,18 @@ function xmldb_forum_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2021051701, 'forum');
     }
 
+    if ($oldversion < 2021051702) {
+        // Define field usecoursefullname to be added to forum.
+        $table = new xmldb_table('forum');
+        $field = new xmldb_field('usecoursefullname', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0',
+            'lockdiscussionafter');
+
+        // Conditionally launch add field usecoursefullname.
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        upgrade_mod_savepoint(true, 2021051702, 'forum');
+    }
+
     return true;
 }
