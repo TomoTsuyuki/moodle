@@ -65,9 +65,20 @@ class convert_submission extends adhoc_task {
             $combineddocument = document_services::get_combined_pdf_for_attempt($assign, $userid, $data->submissionattempt);
             $status = $combineddocument->get_status();
             if ($status == combined_document::STATUS_COMPLETE) {
+                $timestart = microtime(true);
                 document_services::get_page_images_for_attempt($assign, $userid, $data->submissionattempt, false);
                 document_services::get_page_images_for_attempt($assign, $userid, $data->submissionattempt, true);
-
+                $timeend = microtime(true);
+                $combinedfile = $combineddocument->get_combined_file();
+                if ($combinedfile instanceof \stored_file) {
+                    $filesize = $combinedfile->get_filesize();
+                } else {
+                    $filesize = 'Unknown';
+                }
+                $size = display_size($filesize);
+                $pages = $combineddocument->get_page_count();
+                $time = round($timeend - $timestart, 4);
+                mtrace('Combined document size: ' . $size . ', Total number of page:' . $pages . ', Convert time:' . $time . 's');
                 mtrace('The document has been successfully converted');
             } else {
                 throw new \coding_exception('Document conversion completed with status ' . $status);
