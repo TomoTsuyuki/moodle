@@ -398,6 +398,7 @@ class auth extends \auth_plugin_base {
     public function complete_login(client $client, $redirecturl) {
         global $CFG, $SESSION, $PAGE;
 
+        $rawuserinfo = $client->get_raw_userinfo();
         $userinfo = $client->get_userinfo();
 
         if (!$userinfo) {
@@ -598,6 +599,11 @@ class auth extends \auth_plugin_base {
         // We used to call authenticate_user - but that won't work if the current user has a different default authentication
         // method. Since we now ALWAYS link a login - if we get to here we can directly allow the user in.
         $user = (object) $userinfo;
+
+        // Add extra loggedin info.
+        $this->add_loggedin_event_info((array)$rawuserinfo);
+        $user->authobj = $this;
+
         complete_user_login($user);
         $this->update_picture($user);
         redirect($redirecturl);

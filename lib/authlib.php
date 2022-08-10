@@ -117,6 +117,9 @@ class auth_plugin_base {
      */
     protected $errorlogtag = '';
 
+    /** @var arrayStores extra information available to the logged in event. */
+    protected $loggedineventextrainfo = array();
+
     /**
      * This is the primary method that is used by the authenticate_user_login()
      * function in moodlelib.php.
@@ -806,6 +809,25 @@ class auth_plugin_base {
             'subject' => $subject,
             'message' => $message
         ];
+    }
+
+    /**
+     * Stores extra information which can be available to logged in event.
+     *
+     * @param array $values Any Key value pair.
+     * @return void
+     */
+    public function add_loggedin_event_info(array $values): void {
+        $this->loggedineventextrainfo = array_merge($this->loggedineventextrainfo, $values);
+    }
+
+    /**
+     * Returns extra information stored in $loggedineventextrainfo.
+     *
+     * @return array An array of keys and values
+     */
+    public function get_loggedin_event_info(): array {
+        return $this->loggedineventextrainfo;
     }
 }
 

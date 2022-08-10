@@ -4579,12 +4579,23 @@ function complete_user_login($user) {
     // Extra session prefs init.
     set_login_session_preferences();
 
+    // Get extra loggedin info.
+    if (!empty($user->authobj)) {
+        $userauth = $user->authobj;
+    } else {
+        $userauth = get_auth_plugin($user->auth);
+    }
+    $loggedineventinfo = $userauth->get_loggedin_event_info();
+
+    // Merge all into other parameter.
+    $other = array_merge(array('username' => $USER->username), array('idp_data' => $loggedineventinfo));
+
     // Trigger login event.
     $event = \core\event\user_loggedin::create(
         array(
             'userid' => $USER->id,
             'objectid' => $USER->id,
-            'other' => array('username' => $USER->username),
+            'other' => $other,
         )
     );
     $event->trigger();
