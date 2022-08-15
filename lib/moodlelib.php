@@ -4562,9 +4562,10 @@ function authenticate_user_login($username, $password, $ignorelockout=false, &$f
  * - this function does not set any cookies any more!
  *
  * @param stdClass $user
+ * @param array $extrauserinfo
  * @return stdClass A {@link $USER} object - BC only, do not use
  */
-function complete_user_login($user) {
+function complete_user_login($user, array $extrauserinfo = []) {
     global $CFG, $DB, $USER, $SESSION;
 
     \core\session\manager::login_user($user);
@@ -4579,12 +4580,15 @@ function complete_user_login($user) {
     // Extra session prefs init.
     set_login_session_preferences();
 
+    // Merge all into other parameter.
+    $other = array_merge(array('username' => $USER->username), array('extrauserinfo' => $extrauserinfo));
+
     // Trigger login event.
     $event = \core\event\user_loggedin::create(
         array(
             'userid' => $USER->id,
             'objectid' => $USER->id,
-            'other' => array('username' => $USER->username),
+            'other' => $other,
         )
     );
     $event->trigger();
