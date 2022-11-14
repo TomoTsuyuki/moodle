@@ -1817,6 +1817,7 @@ $string['resetstatus'] = 'Status';
 $string['resettable'] = 'Reset table preferences';
 $string['resettask'] = 'Task';
 $string['resettodefaults'] = 'Reset to defaults';
+$string['resetuserpreferences'] = 'Reset user preferences to defaults';
 $string['resortsubcategoriesby'] = 'Sort subcategories by {$a} ascending';
 $string['resortsubcategoriesbyreverse'] = 'Sort subcategories by {$a} descending';
 $string['resortcourses'] = 'Sort courses';

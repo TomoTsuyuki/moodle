@@ -82,6 +82,12 @@ class user_bulk_action_form extends moodleform {
                 get_string('bulkadd', 'core_cohort'));
         }
 
+        if (has_capability('moodle/user:update', $syscontext)) {
+            $actions['resetuserpreference'] = new action_link(
+                new moodle_url('/admin/user/user_bulk_resetuserpreference.php'),
+                get_string('resetuserpreferences'));
+        }
+
         // Any plugin can append actions to this list by implementing a callback
         // <component>_bulk_user_actions() which returns an array of action_link.
         // Each new action's key should have a frankenstyle prefix to avoid clashes.
