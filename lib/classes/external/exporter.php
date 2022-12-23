@@ -141,6 +141,7 @@ abstract class exporter {
                 // Fine, this property can be omitted.
                 continue;
             } else if (!property_exists($record, $property)) {
+                var_dump($record);var_dump($property);
                 // Whoops, we got something that wasn't defined.
                 throw new coding_exception('Unexpected property ' . $property);
             }

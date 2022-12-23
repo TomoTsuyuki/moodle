@@ -674,6 +674,12 @@ EOD;
 
         $pdf = new pdf();
 
+        // Set fontname from course setting.
+        $course = $assignment->get_course();
+        if (!empty($course->pdffont)) {
+            $pdf->set_export_font_name($course->pdffont);
+        }
+
         $fs = get_file_storage();
         $stamptmpdir = make_temp_directory('assignfeedback_editpdf/stamps/' . self::hash($assignment, $userid, $attemptnumber));
         $grade = $assignment->get_user_grade($userid, true, $attemptnumber);

@@ -22,6 +22,10 @@
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+defined('MOODLE_INTERNAL') || die();
+
+require_once($CFG->libdir . '/pdflib.php');
+
 use core_admin\local\settings\filesize;
 
 $capabilities = array(
@@ -154,6 +158,31 @@ if ($hassiteconfig or has_any_capability($capabilities, $systemcontext)) {
             0 => new lang_string('no'),
             1 => new lang_string('yes')
         ]
+    ));
+    $fontlist = [];
+    if (!empty($CFG->pdfexportfont)) {
+        if (is_array($CFG->pdfexportfont)) {
+            $fontlist = $CFG->pdfexportfont;
+        } else {
+            $fontlist[] = $CFG->pdfexportfont;
+        }
+    }
+    // Verify fonts.
+    $pdf = new \pdf;
+    $availablefonts = $pdf->get_font_families();
+    foreach ($fontlist as $key => $value) {
+        if (empty($availablefonts[$key])) {
+            unset($fontlist[$key]);
+        }
+    }
+    if (empty($fontlist)) {
+        // Default font if there is no valuse set in CFG.
+        $fontlist = ['freesans' => 'freesans'];
+    }
+    $temp->add(new admin_setting_configselect('moodlecourse/pdffont',
+        new lang_string('pdfexportfont'),
+        new lang_string('pdfexportfont_help'),
+        'freesans', $fontlist
     ));
 
     // Files and uploads.
