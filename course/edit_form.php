@@ -4,6 +4,7 @@ defined('MOODLE_INTERNAL') || die;
 
 require_once($CFG->libdir.'/formslib.php');
 require_once($CFG->libdir.'/completionlib.php');
+require_once($CFG->libdir . '/pdflib.php');
 
 /**
  * The form for handling editing a course.
@@ -317,6 +318,32 @@ class course_edit_form extends moodleform {
         $mform->addElement('select', 'maxbytes', get_string('maximumupload'), $choices);
         $mform->addHelpButton('maxbytes', 'maximumupload');
         $mform->setDefault('maxbytes', $courseconfig->maxbytes);
+
+        if (!empty($CFG->enablepdffont)) {
+            $fontlist = [];
+            if (!empty($CFG->pdfexportfont)) {
+                if (is_array($CFG->pdfexportfont)) {
+                    $fontlist = $CFG->pdfexportfont;
+                } else {
+                    $fontlist[$CFG->pdfexportfont] = $CFG->pdfexportfont;
+                }
+            }
+            // Verify fonts.
+            $pdf = new \pdf;
+            $availablefonts = $pdf->get_font_families();
+            foreach ($fontlist as $key => $value) {
+                if (empty($availablefonts[$key])) {
+                    unset($fontlist[$key]);
+                }
+            }
+            if (empty($fontlist)) {
+                // Default font if there is no valuse set in CFG.
+                $fontlist = ['freesans' => 'freesans'];
+            }
+            $mform->addElement('select', 'pdffont', get_string('pdfexportfont'), $fontlist);
+            $mform->addHelpButton('pdffont', 'pdfexportfont');
+            $mform->setDefault('pdffont', $courseconfig->pdffont);
+        }
 
         // Completion tracking.
         if (completion_info::is_enabled_for_site()) {

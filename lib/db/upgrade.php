@@ -2984,5 +2984,19 @@ privatefiles,moodle|/user/files.php';
         upgrade_main_savepoint(true, 2023020800.00);
     }
 
+    if ($oldversion < 2023020800.01) {
+        // Define field pdffont to be added to course.
+        $table = new xmldb_table('course');
+        $field = new xmldb_field('pdffont', XMLDB_TYPE_CHAR, '50', null, false, false, null, 'showcompletionconditions');
+
+        // Conditionally launch add field pdffont.
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        // Main savepoint reached.
+        upgrade_main_savepoint(true, 2023020800.01);
+    }
+
     return true;
 }

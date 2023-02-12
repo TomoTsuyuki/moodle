@@ -645,6 +645,7 @@ EOD;
      * @return stored_file
      */
     public static function generate_feedback_document($assignment, $userid, $attemptnumber) {
+        global $CFG;
 
         $assignment = self::get_assignment_from_param($assignment);
 
@@ -673,6 +674,14 @@ EOD;
         $file->copy_content_to($combined); // Copy the file.
 
         $pdf = new pdf();
+
+        // Set fontname from course setting if it's enabled.
+        if (!empty($CFG->enablepdffont)) {
+            $course = $assignment->get_course();
+            if (!empty($course->pdffont)) {
+                $pdf->set_export_font_name($course->pdffont);
+            }
+        }
 
         $fs = get_file_storage();
         $stamptmpdir = make_temp_directory('assignfeedback_editpdf/stamps/' . self::hash($assignment, $userid, $attemptnumber));
