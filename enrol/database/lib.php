@@ -293,7 +293,7 @@ class enrol_database_plugin extends enrol_plugin {
      * @param null|int $onecourse limit sync to one course only (used primarily in restore)
      * @return int 0 means success, 1 db connect failure, 2 db read failure
      */
-    public function sync_enrolments(progress_trace $trace, $onecourse = null) {
+    public function sync_enrolments(progress_trace $trace, $onecourse = null, $courses = null) {
         global $CFG, $DB;
 
         // We do not create courses here intentionally because it requires full sync and is slow.
@@ -369,22 +369,12 @@ class enrol_database_plugin extends enrol_plugin {
 
         } else {
             // Get a list of courses to be synced that are in external table.
-            $externalcourses = array();
-            $sql = $this->db_get_sql($table, array(), array($coursefield), true);
-            if ($rs = $extdb->Execute($sql)) {
-                if (!$rs->EOF) {
-                    while ($mapping = $rs->FetchRow()) {
-                        $mapping = reset($mapping);
-                        $mapping = $this->db_decode($mapping);
-                        if (empty($mapping)) {
-                            // invalid mapping
-                            continue;
-                        }
-                        $externalcourses[$mapping] = true;
-                    }
-                }
-                $rs->Close();
+            if ($courses) {
+                $externalcourses = $courses;
             } else {
+                $externalcourses = $this->get_external_courses();
+            }
+            if ($externalcourses === false) {
                 $trace->output('Error reading data from the external enrolment table');
                 $extdb->Close();
                 return 2;
@@ -639,6 +629,46 @@ class enrol_database_plugin extends enrol_plugin {
     }
 
     /**
+     * @return array|false
+     */
+    public function get_external_courses() {
+        if (!$this->get_config('dbtype') or !$this->get_config('remoteenroltable') or !$this->get_config('remotecoursefield')) {
+            var_dump("AAAAAAAAAAAAAAAAAAA");
+            return false;
+        }
+        if (!$extdb = $this->db_init()) {
+            var_dump("BBBBBBBBBBBBBBBBBBBB");
+            return false;
+        }
+        $table = $this->get_config('remoteenroltable');
+        $coursefield = trim($this->get_config('remotecoursefield'));
+        // Get a list of courses to be synced that are in external table.
+        $externalcourses = array();
+        $sql = $this->db_get_sql($table, array(), array($coursefield), true);
+        var_dump($sql);
+        if ($rs = $extdb->Execute($sql)) {
+            if (!$rs->EOF) {
+                while ($mapping = $rs->FetchRow()) {
+                    $mapping = reset($mapping);
+                    $mapping = $this->db_decode($mapping);
+                    if (empty($mapping)) {
+                        // invalid mapping
+                        continue;
+                    }
+                    $externalcourses[$mapping] = true;
+                }
+            }
+            $rs->Close();
+            return $externalcourses;
+        } else {
+            $extdb->Close();
+
+            var_dump("CCCCCCCCCCCCCCCCCCCC");
+            return false;
+        }
+    }
+
+    /**
      * Performs a full sync with external database.
      *
      * First it creates new courses if necessary, then
@@ -700,6 +730,11 @@ class enrol_database_plugin extends enrol_plugin {
         }
         $sql = $this->db_get_sql($table, array(), $sqlfields, true);
         $createcourses = array();
+        var_dump($sql);
+//        $records = $DB->get_records('enrol_database_test_courses');
+//        var_dump($records);
+//        $records = $extdb->get_records('enrol_database_test_courses');
+//        var_dump($records);
         if ($rs = $extdb->Execute($sql)) {
             if (!$rs->EOF) {
                 while ($fields = $rs->FetchRow()) {

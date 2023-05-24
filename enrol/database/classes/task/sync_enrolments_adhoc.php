@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Sync enrolments task
+ * Sync enrolments adhoc task
  * @package   enrol_database
- * @copyright 2018 Daniel Neis Araujo <danielneis@gmail.com>
+ * @copyright Tomo Tsuyuki <tomotsuyuki@catalyst-au.net>
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
@@ -31,7 +31,7 @@ defined('MOODLE_INTERNAL') || die();
  * @copyright 2018 Daniel Neis Araujo <danielneis@gmail.com>
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class sync_enrolments extends \core\task\scheduled_task {
+class sync_enrolments_adhoc extends \core\task\adhoc_task {
 
     /**
      * Name for this task.
@@ -39,7 +39,7 @@ class sync_enrolments extends \core\task\scheduled_task {
      * @return string
      */
     public function get_name() {
-        return get_string('syncenrolmentstask', 'enrol_database');
+        return get_string('syncenrolmentstaskadhoc', 'enrol_database');
     }
 
     /**
@@ -47,6 +47,7 @@ class sync_enrolments extends \core\task\scheduled_task {
      */
     public function execute() {
 
+        $courses = $this->get_custom_data()->courses;
         $trace = new \text_progress_trace();
 
         if (!enrol_is_enabled('database')) {
@@ -55,22 +56,6 @@ class sync_enrolments extends \core\task\scheduled_task {
         }
 
         $enrol = enrol_get_plugin('database');
-
-        // Update enrolments -- these handlers should autocreate courses if required.
-        $enrol->sync_courses($trace);
-        $courses = $enrol->get_external_courses();
-        var_dump($courses);exit;
-
-        if (count($courses) > 100) {
-            // If more than 100 courses, task divides by 100 courses.
-            foreach (array_chunk($courses, 100, true) as $chunk) {
-                $data = ['courses' => $chunk];
-                $task = new sync_enrolments_adhoc();
-                $task->set_custom_data($data);
-                \core\task\manager::queue_adhoc_task($task);
-            }
-        } else {
-            $enrol->sync_enrolments($trace, null, $courses);
-        }
+        $enrol->sync_enrolments($trace, null, $courses);
     }
 }

@@ -802,4 +802,59 @@ class sync_test extends \advanced_testcase {
         // Final cleanup - remove extra tables, fixtures and caches.
         $this->cleanup_enrol_database();
     }
+
+    /**
+     * Test for sync_enrolments task.
+     */
+    public function test_sync_enrolments_task() {
+        global $CFG, $DB;
+        set_config('enrol_plugins_enabled', 'database');
+
+        set_config('remoteenroltable', $CFG->prefix.'enrol_database_test_enrols', 'enrol_database');
+        set_config('remotecoursefield', 'courseid', 'enrol_database');
+        set_config('remoteuserfield', 'userid', 'enrol_database');
+        set_config('remoterolefield', 'roleid', 'enrol_database');
+        set_config('remoteotheruserfield', 'otheruser', 'enrol_database');
+
+        $this->init_enrol_database();
+        $this->resetAfterTest();
+        $this->reset_enrol_database();
+
+        $courses = [];
+        for ($i = 0; $i < 50; $i++) {
+            $courses[] = ['fullname' => 'New course ' . $i, 'shortname' => 'nc' . $i, 'idnumber' => 'ncid' . $i];
+        }
+        $DB->insert_records('enrol_database_test_courses', $courses);
+
+//        $records = $DB->get_records('enrol_database_test_courses');
+//        var_dump($records);
+
+        $this->assertEquals(1 + count(self::$courses), $DB->count_records('course'));
+
+        set_config('localcoursefield', 'idnumber', 'enrol_database');
+        set_config('localuserfield', 'idnumber', 'enrol_database');
+        set_config('localrolefield', 'shortname', 'enrol_database');
+
+        $enrols = [
+            ['userid' => 'userid1', 'courseid' => 'courseid1', 'roleid' => 'student'],
+            ['userid' => 'userid1', 'courseid' => 'courseid2', 'roleid' => 'editingteacher'],
+            ['userid' => 'userid2', 'courseid' => 'courseid1', 'roleid' => 'student'],
+            ['userid' => 'userid1', 'courseid' => 'ncid1', 'roleid' => 'student'],
+            ['userid' => 'userid1', 'courseid' => 'ncid2', 'roleid' => 'editingteacher'],
+            ['userid' => 'userid2', 'courseid' => 'ncid1', 'roleid' => 'student'],
+        ];
+        $DB->insert_records('enrol_database_test_enrols', $enrols);
+//        $this->assertEquals(0, $DB->count_records('user_enrolments', array()));
+//        $this->assertEquals(0, $DB->count_records('enrol', array('enrol' => 'database')));
+//        $this->assertEquals(0, $DB->count_records('role_assignments', array('component' => 'enrol_database')));
+
+        $task = new \enrol_database\task\sync_enrolments();
+        ob_start();
+        $task->execute();
+        $output = ob_get_clean();
+echo $output;
+        $this->assertEquals(1 + count(self::$courses) + 50, $DB->count_records('course'));
+
+        $this->cleanup_enrol_database();
+    }
 }
