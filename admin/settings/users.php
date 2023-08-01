@@ -110,6 +110,24 @@ if ($hassiteconfig
             ['moodle/cohort:configurecustomfields']
         )
     );
+    $ADMIN->add(
+        'accounts',
+        new admin_externalpage(
+            'group_customfield',
+            new lang_string('group_customfield', 'admin'),
+            $CFG->wwwroot . '/group/customfield.php',
+            ['moodle/group:configurecustomfields']
+        )
+    );
+    $ADMIN->add(
+        'accounts',
+        new admin_externalpage(
+            'grouping_customfield',
+            new lang_string('grouping_customfield', 'admin'),
+            $CFG->wwwroot . '/group/grouping_customfield.php',
+            ['moodle/group:configurecustomfields']
+        )
+    );
 
     // Stuff under the "roles" subcategory.
 

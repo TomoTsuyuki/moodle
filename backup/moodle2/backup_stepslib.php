@@ -1340,6 +1340,7 @@ class backup_userscompletion_structure_step extends backup_structure_step {
 class backup_groups_structure_step extends backup_structure_step {
 
     protected function define_structure() {
+        global $DB;
 
         // To know if we are including users.
         $userinfo = $this->get_setting_value('users');
@@ -1354,6 +1355,10 @@ class backup_groups_structure_step extends backup_structure_step {
             'name', 'idnumber', 'description', 'descriptionformat', 'enrolmentkey',
             'picture', 'visibility', 'participation', 'timecreated', 'timemodified'));
 
+        $groupcustomfields = new backup_nested_element('groupcustomfields');
+        $groupcustomfield = new backup_nested_element('groupcustomfield', ['id'], [
+            'shortname', 'type', 'value', 'valueformat', 'groupid']);
+
         $members = new backup_nested_element('group_members');
 
         $member = new backup_nested_element('group_member', array('id'), array(
@@ -1365,6 +1370,10 @@ class backup_groups_structure_step extends backup_structure_step {
             'name', 'idnumber', 'description', 'descriptionformat', 'configdata',
             'timecreated', 'timemodified'));
 
+        $groupingcustomfields = new backup_nested_element('groupingcustomfields');
+        $groupingcustomfield = new backup_nested_element('groupingcustomfield', ['id'], [
+            'shortname', 'type', 'value', 'valueformat', 'groupingid']);
+
         $groupinggroups = new backup_nested_element('grouping_groups');
 
         $groupinggroup = new backup_nested_element('grouping_group', array('id'), array(
@@ -1373,12 +1382,16 @@ class backup_groups_structure_step extends backup_structure_step {
         // Build the tree
 
         $groups->add_child($group);
+        $groups->add_child($groupcustomfields);
+        $groupcustomfields->add_child($groupcustomfield);
         $groups->add_child($groupings);
 
         $group->add_child($members);
         $members->add_child($member);
 
         $groupings->add_child($grouping);
+        $groupings->add_child($groupingcustomfields);
+        $groupingcustomfields->add_child($groupingcustomfield);
         $grouping->add_child($groupinggroups);
         $groupinggroups->add_child($groupinggroup);
 
@@ -1405,6 +1418,24 @@ class backup_groups_structure_step extends backup_structure_step {
             if ($userinfo) {
                 $member->set_source_table('groups_members', array('groupid' => backup::VAR_PARENTID));
             }
+
+            $handler = \core_group\customfield\group_handler::create();
+            $fieldsforbackup = [];
+            if ($groupsdata = $DB->get_records('groups', ['courseid' => $this->task->get_courseid()], '', 'id')) {
+                foreach ($groupsdata as $groupdata) {
+                    $fieldsforbackup = array_merge($fieldsforbackup, $handler->get_instance_data_for_backup($groupdata->id));
+                }
+            }
+            $groupcustomfield->set_source_array($fieldsforbackup);
+
+            $handler = \core_group\customfield\grouping_handler::create();
+            $fieldsforbackup = [];
+            if ($groupingsdata = $DB->get_records('groupings', ['courseid' => $this->task->get_courseid()], '', 'id')) {
+                foreach ($groupingsdata as $groupingdata) {
+                    $fieldsforbackup = array_merge($fieldsforbackup, $handler->get_instance_data_for_backup($groupingdata->id));
+                }
+            }
+            $groupingcustomfield->set_source_array($fieldsforbackup);
         }
 
         // Define id annotations (as final)
