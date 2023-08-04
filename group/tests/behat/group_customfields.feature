@@ -21,7 +21,7 @@ Feature: Add and use group custom fields
 
   Scenario: Create a new group custom field and use the field for a new group
     When I log in as "admin"
-    And I navigate to "Users > Accounts > Group custom fields" in site administration
+    And I navigate to "Courses > Groups > Group custom fields" in site administration
     Then I should see "Category for group1"
     And I click on "Add a new custom field" "link"
     And I click on "Short text" "link"
@@ -48,7 +48,7 @@ Feature: Add and use group custom fields
 
   Scenario: Create a new grouping custom field and use the field for a new grouping
     When I log in as "admin"
-    And I navigate to "Users > Accounts > Grouping custom fields" in site administration
+    And I navigate to "Courses > Groups > Grouping custom fields" in site administration
     Then I should see "Category for grouping1"
     And I click on "Add a new custom field" "link"
     And I click on "Short text" "link"

@@ -86,13 +86,7 @@ class data_controller extends \core_customfield\data_controller {
     public function instance_form_save(\stdClass $datanew) {
         $fieldname = $this->get_form_element_name();
         if (!property_exists($datanew, $fieldname)) {
-            // In case the data is from webservice or import.
-            $fieldapiname = parent::get_form_element_name();
-            if (!empty($datanew->$fieldapiname)) {
-                $datanew->$fieldname = ['text' => $datanew->$fieldapiname, 'format' => 1];
-            } else {
-                return;
-            }
+            return;
         }
         $fromform = $datanew->$fieldname;
 

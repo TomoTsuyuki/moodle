@@ -27,6 +27,7 @@ defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->dirroot . '/group/lib.php');
+require_once($CFG->dirroot . '/lib/grouplib.php');
 
 /**
  * Group lib testcase.
@@ -442,9 +443,9 @@ class lib_test extends \advanced_testcase {
     /**
      * Test custom field for group.
      * @covers ::groups_create_group
+     * @covers ::groups_get_group
      */
     public function test_groups_with_customfield() {
-        global $DB;
         $this->resetAfterTest();
         $this->setAdminUser();
 
@@ -508,6 +509,11 @@ class lib_test extends \advanced_testcase {
         $data = $grouphandler->export_instance_data_object($group2->id);
         $this->assertSame('Updated input for group2', $data->testgroupcustomfield1);
 
+        $group = groups_get_group($group1->id, '*', IGNORE_MISSING, true);
+        $this->assertCount(1, $group->customfields);
+        $customfield = reset($group->customfields);
+        $this->assertSame('Updated input for group1', $customfield['value']);
+
         $grouping1->customfield_testgroupingcustomfield1 = 'Updated input for grouping1';
         $grouping2->customfield_testgroupingcustomfield1 = 'Updated input for grouping2';
         groups_update_grouping($grouping1);
@@ -516,6 +522,11 @@ class lib_test extends \advanced_testcase {
         $this->assertSame('Updated input for grouping1', $data->testgroupingcustomfield1);
         $data = $groupinghandler->export_instance_data_object($grouping2->id);
         $this->assertSame('Updated input for grouping2', $data->testgroupingcustomfield1);
+
+        $grouping = groups_get_grouping($grouping1->id, '*', IGNORE_MISSING, true);
+        $this->assertCount(1, $grouping->customfields);
+        $customfield = reset($grouping->customfields);
+        $this->assertSame('Updated input for grouping1', $customfield['value']);
     }
 
     public function test_groups_create_autogroups () {

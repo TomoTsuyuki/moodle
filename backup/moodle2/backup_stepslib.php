@@ -1340,7 +1340,6 @@ class backup_userscompletion_structure_step extends backup_structure_step {
 class backup_groups_structure_step extends backup_structure_step {
 
     protected function define_structure() {
-        global $DB;
 
         // To know if we are including users.
         $userinfo = $this->get_setting_value('users');
@@ -1419,23 +1418,9 @@ class backup_groups_structure_step extends backup_structure_step {
                 $member->set_source_table('groups_members', array('groupid' => backup::VAR_PARENTID));
             }
 
-            $handler = \core_group\customfield\group_handler::create();
-            $fieldsforbackup = [];
-            if ($groupsdata = $DB->get_records('groups', ['courseid' => $this->task->get_courseid()], '', 'id')) {
-                foreach ($groupsdata as $groupdata) {
-                    $fieldsforbackup = array_merge($fieldsforbackup, $handler->get_instance_data_for_backup($groupdata->id));
-                }
-            }
-            $groupcustomfield->set_source_array($fieldsforbackup);
-
-            $handler = \core_group\customfield\grouping_handler::create();
-            $fieldsforbackup = [];
-            if ($groupingsdata = $DB->get_records('groupings', ['courseid' => $this->task->get_courseid()], '', 'id')) {
-                foreach ($groupingsdata as $groupingdata) {
-                    $fieldsforbackup = array_merge($fieldsforbackup, $handler->get_instance_data_for_backup($groupingdata->id));
-                }
-            }
-            $groupingcustomfield->set_source_array($fieldsforbackup);
+            $courseid = $this->task->get_courseid();
+            $groupcustomfield->set_source_array($this->get_group_custom_fields_for_backup($courseid));
+            $groupingcustomfield->set_source_array($this->get_grouping_custom_fields_for_backup($courseid));
         }
 
         // Define id annotations (as final)
@@ -1450,6 +1435,40 @@ class backup_groups_structure_step extends backup_structure_step {
 
         // Return the root element (groups)
         return $groups;
+    }
+
+    /**
+     * Get custom fields array for group
+     * @param int $courseid
+     * @return array
+     */
+    protected function get_group_custom_fields_for_backup(int $courseid): array {
+        global $DB;
+        $handler = \core_group\customfield\group_handler::create();
+        $fieldsforbackup = [];
+        if ($groups = $DB->get_records('groups', ['courseid' => $courseid], '', 'id')) {
+            foreach ($groups as $group) {
+                $fieldsforbackup = array_merge($fieldsforbackup, $handler->get_instance_data_for_backup($group->id));
+            }
+        }
+        return $fieldsforbackup;
+    }
+
+    /**
+     * Get custom fields array for grouping
+     * @param int $courseid
+     * @return array
+     */
+    protected function get_grouping_custom_fields_for_backup(int $courseid): array {
+        global $DB;
+        $handler = \core_group\customfield\grouping_handler::create();
+        $fieldsforbackup = [];
+        if ($groupings = $DB->get_records('groupings', ['courseid' => $courseid], '', 'id')) {
+            foreach ($groupings as $grouping) {
+                $fieldsforbackup = array_merge($fieldsforbackup, $handler->get_instance_data_for_backup($grouping->id));
+            }
+        }
+        return $fieldsforbackup;
     }
 }
 

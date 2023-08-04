@@ -1241,12 +1241,24 @@ function set_groups_messaging(array $groupids, bool $enabled): void {
  * @param array $groupids a list of group IDs to provide data for.
  * @return \core_customfield\data_controller[]
  */
-function group_get_custom_fields_data(array $groupids): array {
+function get_group_custom_fields_data(array $groupids): array {
     $result = [];
 
     if (!empty($groupids)) {
         $handler = \core_group\customfield\group_handler::create();
-        $result = $handler->get_instances_data($groupids, true);
+        $customfieldsdata = $handler->get_instances_data($groupids, true);
+
+        foreach ($customfieldsdata as $groupid => $fieldcontrollers) {
+            foreach ($fieldcontrollers as $fieldcontroller) {
+                $result[$groupid][] = [
+                    'type' => $fieldcontroller->get_field()->get('type'),
+                    'value' => $fieldcontroller->export_value(),
+                    'valueraw' => $fieldcontroller->get_value(),
+                    'name' => $fieldcontroller->get_field()->get('name'),
+                    'shortname' => $fieldcontroller->get_field()->get('shortname'),
+                ];
+            }
+        }
     }
 
     return $result;
@@ -1258,12 +1270,24 @@ function group_get_custom_fields_data(array $groupids): array {
  * @param array $groupingids a list of group IDs to provide data for.
  * @return \core_customfield\data_controller[]
  */
-function grouping_get_custom_fields_data(array $groupingids): array {
+function get_grouping_custom_fields_data(array $groupingids): array {
     $result = [];
 
     if (!empty($groupingids)) {
         $handler = \core_group\customfield\grouping_handler::create();
-        $result = $handler->get_instances_data($groupingids, true);
+        $customfieldsdata = $handler->get_instances_data($groupingids, true);
+
+        foreach ($customfieldsdata as $groupingid => $fieldcontrollers) {
+            foreach ($fieldcontrollers as $fieldcontroller) {
+                $result[$groupingid][] = [
+                    'type' => $fieldcontroller->get_field()->get('type'),
+                    'value' => $fieldcontroller->export_value(),
+                    'valueraw' => $fieldcontroller->get_value(),
+                    'name' => $fieldcontroller->get_field()->get('name'),
+                    'shortname' => $fieldcontroller->get_field()->get('shortname'),
+                ];
+            }
+        }
     }
 
     return $result;

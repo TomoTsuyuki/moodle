@@ -143,7 +143,6 @@ class core_group_external extends external_api {
                     $fieldname = self::build_custom_field_name($field['shortname']);
                     $group->{$fieldname} = $field['value'];
                 }
-                unset($group->customfields);
             }
 
             // finally create the group
@@ -184,7 +183,7 @@ class core_group_external extends external_api {
                             'group visibility mode. 0 = Visible to all. 1 = Visible to members. 2 = See own membership. '
                             . '3 = Membership is hidden.'),
                     'participation' => new external_value(PARAM_BOOL, 'participation mode'),
-                    'customfields' => self::build_custom_fields_returns_structure(),
+                    'customfields' => self::build_custom_fields_parameters_structure(),
                 )
             ), 'List of group object. A group has an id, a courseid, a name, a description and an enrolment key.'
         );
@@ -216,7 +215,7 @@ class core_group_external extends external_api {
         $params = self::validate_parameters(self::get_groups_parameters(), array('groupids'=>$groupids));
 
         $groups = array();
-        $customfieldsdata = self::get_group_custom_fields_data($groupids);
+        $customfieldsdata = get_group_custom_fields_data($groupids);
         foreach ($params['groupids'] as $groupid) {
             // validate params
             $group = groups_get_group($groupid, 'id, courseid, name, idnumber, description, descriptionformat, enrolmentkey, '
@@ -707,7 +706,6 @@ class core_group_external extends external_api {
                     $fieldname = self::build_custom_field_name($field['shortname']);
                     $grouping->{$fieldname} = $field['value'];
                 }
-                unset($grouping->customfields);
             }
 
             // Finally create the grouping.
@@ -735,7 +733,8 @@ class core_group_external extends external_api {
                     'name' => new external_value(PARAM_TEXT, 'multilang compatible name, course unique'),
                     'description' => new external_value(PARAM_RAW, 'grouping description text'),
                     'descriptionformat' => new external_format_value('description'),
-                    'idnumber' => new external_value(PARAM_RAW, 'id number')
+                    'idnumber' => new external_value(PARAM_RAW, 'id number'),
+                    'customfields' => self::build_custom_fields_parameters_structure(),
                 )
             ), 'List of grouping object. A grouping has an id, a courseid, a name and a description.'
         );
@@ -821,7 +820,6 @@ class core_group_external extends external_api {
                     $fieldname = self::build_custom_field_name($field['shortname']);
                     $grouping->{$fieldname} = $field['value'];
                 }
-                unset($grouping->customfields);
             }
 
             // Finally update the grouping.
@@ -877,7 +875,7 @@ class core_group_external extends external_api {
                                                   'returngroups' => $returngroups));
 
         $groupings = array();
-        $groupingcustomfieldsdata = self::get_grouping_custom_fields_data($groupingids);
+        $groupingcustomfieldsdata = get_grouping_custom_fields_data($groupingids);
         foreach ($params['groupingids'] as $groupingid) {
             // Validate params.
             $grouping = groups_get_grouping($groupingid, '*', MUST_EXIST);
@@ -922,7 +920,7 @@ class core_group_external extends external_api {
                                           );
                         $groupids[] = $grouprecord->groupid;
                     }
-                    $groupcustomfieldsdata = self::get_group_custom_fields_data($groupids);
+                    $groupcustomfieldsdata = get_group_custom_fields_data($groupids);
                     foreach ($groups as $i => $group) {
                         $groups[$i]['customfields'] = $groupcustomfieldsdata[$group['id']] ?? [];
                     }
@@ -1684,7 +1682,6 @@ class core_group_external extends external_api {
                     $fieldname = self::build_custom_field_name($field['shortname']);
                     $group->{$fieldname} = $field['value'];
                 }
-                unset($group->customfields);
             }
 
             groups_update_group($group);
@@ -1715,7 +1712,7 @@ class core_group_external extends external_api {
             new external_single_structure([
                 'shortname' => new external_value(PARAM_ALPHANUMEXT, 'The shortname of the custom field'),
                 'value' => new external_value(PARAM_RAW, 'The value of the custom field'),
-            ]), 'Custom fields for the group', VALUE_OPTIONAL
+            ]), 'Custom fields', VALUE_OPTIONAL
         );
     }
 
@@ -1736,58 +1733,6 @@ class core_group_external extends external_api {
                 'value' => new external_value(PARAM_RAW, 'The value of the custom field'),
             ]), 'Custom fields', VALUE_OPTIONAL
         );
-    }
-
-    /**
-     * Returns custom fields data for provided groups.
-     *
-     * @param array $groupids a list of cohort IDs to provide data for.
-     * @return array
-     */
-    protected static function get_group_custom_fields_data(array $groupids): array {
-        $result = [];
-
-        $customfieldsdata = group_get_custom_fields_data($groupids);
-
-        foreach ($customfieldsdata as $cohortid => $fieldcontrollers) {
-            foreach ($fieldcontrollers as $fieldcontroller) {
-                $result[$cohortid][] = [
-                    'type' => $fieldcontroller->get_field()->get('type'),
-                    'value' => $fieldcontroller->export_value(),
-                    'valueraw' => $fieldcontroller->get_value(),
-                    'name' => $fieldcontroller->get_field()->get('name'),
-                    'shortname' => $fieldcontroller->get_field()->get('shortname'),
-                ];
-            }
-        }
-
-        return $result;
-    }
-
-    /**
-     * Returns custom fields data for provided groups.
-     *
-     * @param array $groupids a list of cohort IDs to provide data for.
-     * @return array
-     */
-    protected static function get_grouping_custom_fields_data(array $groupids): array {
-        $result = [];
-
-        $customfieldsdata = grouping_get_custom_fields_data($groupids);
-
-        foreach ($customfieldsdata as $cohortid => $fieldcontrollers) {
-            foreach ($fieldcontrollers as $fieldcontroller) {
-                $result[$cohortid][] = [
-                    'type' => $fieldcontroller->get_field()->get('type'),
-                    'value' => $fieldcontroller->export_value(),
-                    'valueraw' => $fieldcontroller->get_value(),
-                    'name' => $fieldcontroller->get_field()->get('name'),
-                    'shortname' => $fieldcontroller->get_field()->get('shortname'),
-                ];
-            }
-        }
-
-        return $result;
     }
 
     /**

@@ -140,16 +140,16 @@ class group_handler extends handler {
      */
     public function get_instance_data_for_backup(int $instanceid): array {
         $finalfields = [];
-        $data = $this->get_instance_data($instanceid, true);
-        foreach ($data as $d) {
-            if ($d->get('id') && $this->can_backup($d->get_field(), $instanceid)) {
+        $instancedata = $this->get_instance_data($instanceid, true);
+        foreach ($instancedata as $data) {
+            if ($data->get('id') && $this->can_backup($data->get_field(), $instanceid)) {
                 $finalfields[] = [
-                    'id' => $d->get('id'),
-                    'shortname' => $d->get_field()->get('shortname'),
-                    'type' => $d->get_field()->get('type'),
-                    'value' => $d->get_value(),
-                    'valueformat' => $d->get('valueformat'),
-                    'groupid' => $d->get('instanceid'),
+                    'id' => $data->get('id'),
+                    'shortname' => $data->get_field()->get('shortname'),
+                    'type' => $data->get_field()->get('type'),
+                    'value' => $data->get_value(),
+                    'valueformat' => $data->get('valueformat'),
+                    'groupid' => $data->get('instanceid'),
                 ];
             }
         }

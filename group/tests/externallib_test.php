@@ -682,8 +682,8 @@ class externallib_test extends externallib_advanced_testcase {
         $this->assertEquals($grouping['description'], $dbgroup->description);
         $this->assertEquals($grouping['idnumber'], $dbgroup->idnumber);
 
-        $data = group_handler::create()->export_instance_data_object($createdgrouping['id'], true);
-        $this->assertEquals('Test grouping value 1', $data->testgroupcustomfield1);
+        $data = grouping_handler::create()->export_instance_data_object($createdgrouping['id'], true);
+        $this->assertEquals('Test grouping value 1', $data->testgroupingcustomfield1);
     }
 
     /**
