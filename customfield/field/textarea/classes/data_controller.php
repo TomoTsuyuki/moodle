@@ -170,18 +170,20 @@ class data_controller extends \core_customfield\data_controller {
             return null;
         }
 
+        $configdata = $this->get_field()->get('configdata');
         if ($dataid = $this->get('id')) {
             $context = $this->get_context();
             $processed = file_rewrite_pluginfile_urls($value, 'pluginfile.php',
                 $context->id, 'customfield_textarea', 'value', $dataid);
-            $value = format_text($processed, $this->get('valueformat'), ['context' => $context]);
+            $value = format_text($processed, $this->get('valueformat'),
+                ['context' => $context, 'noclean' => $configdata['noclean'] ?? 0]);
         } else {
             $fieldid = $this->get_field()->get('id');
             $configcontext = $this->get_field()->get_handler()->get_configuration_context();
             $processed = file_rewrite_pluginfile_urls($value, 'pluginfile.php',
                 $configcontext->id, 'customfield_textarea', 'defaultvalue', $fieldid);
             $valueformat = $this->get_field()->get_configdata_property('defaultvalueformat');
-            $value = format_text($processed, $valueformat, ['context' => $configcontext]);
+            $value = format_text($processed, $valueformat, ['context' => $configcontext, $configdata['noclean'] ?? 0]);
         }
 
         return $value;

@@ -25,5 +25,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $string['pluginname'] = 'Text area';
+$string['noclean'] = 'No clean';
+$string['noclean_help'] = 'If yes the some specific tags won\'t be cleaned.';
 $string['privacy:metadata'] = 'The Text area field type plugin doesn\'t store any personal data; it uses tables defined in core.';
 $string['specificsettings'] = 'Text area field settings';

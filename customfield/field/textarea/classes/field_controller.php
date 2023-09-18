@@ -99,6 +99,9 @@ class field_controller extends \core_customfield\field_controller {
 
         $mform->addElement('editor', 'configdata[defaultvalue_editor]', get_string('defaultvalue', 'core_customfield'),
             null, $desceditoroptions);
+        $mform->addElement('selectyesno', 'configdata[noclean]', get_string('noclean', 'customfield_textarea'),
+            get_string('noclean_help', 'customfield_textarea'));
+        $mform->addHelpButton('configdata[noclean]', 'noclean', 'customfield_textarea');
     }
 
     /**
@@ -113,7 +116,9 @@ class field_controller extends \core_customfield\field_controller {
         if (!$context) {
             $context = $this->get_handler()->get_configuration_context();
         }
-        return ['maxfiles' => EDITOR_UNLIMITED_FILES, 'maxbytes' => $CFG->maxbytes, 'context' => $context];
+        $configdata = $this->get('configdata');
+        return ['maxfiles' => EDITOR_UNLIMITED_FILES, 'maxbytes' => $CFG->maxbytes, 'context' => $context,
+            'noclean' => $configdata['noclean'] ?? 0];
     }
 
     /**
