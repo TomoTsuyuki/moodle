@@ -174,6 +174,72 @@ class plugin_test extends \advanced_testcase {
     }
 
     /**
+     * Data provider for test_noclear_option().
+     *
+     * @return array
+     */
+    public function noclear_option_provider(): array {
+        return [
+            'iframe tag' => [
+                'Text with iframe tag<iframe src="https://moodle.org/">',
+                'Text with iframe tag',
+                'Text with iframe tag<iframe src="https://moodle.org/">',
+            ],
+            'object tag' => [
+                '"lala <object>xx</object>"',
+                '"lala xx"',
+                '"lala <object>xx</object>"',
+            ],
+        ];
+    }
+
+    /**
+     * Test noclean field option.
+     * @dataProvider noclear_option_provider
+     * @param string $text HTML text to set to the customfield.
+     * @param string $expectedclean Expected text after set data without noclean option.
+     * @param string $expectednoclean Expected text after set data with noclean option.
+     * @covers \customfield_textarea\data_controller::export_value
+     */
+    public function test_noclear_option($text, $expectedclean, $expectednoclean) {
+        global $CFG, $DB;
+
+        require_once("{$CFG->dirroot}/customfield/tests/fixtures/test_instance_form.php");
+
+        $this->setAdminUser();
+
+        $handler = $this->cfcat->get_handler();
+
+        // Set our custom field value.
+        $submitdata = (array) $this->courses[1] + [
+                'customfield_myfield1_editor' => ['text' => $text, 'format' => FORMAT_HTML],
+                'customfield_myfield2_editor' => ['text' => $text, 'format' => FORMAT_HTML],
+            ];
+
+        core_customfield_test_instance_form::mock_submit($submitdata, []);
+        $form = new core_customfield_test_instance_form('post', ['handler' => $handler, 'instance' => $this->courses[1]]);
+        $handler->instance_form_save($form->get_data());
+
+        // Tags are stripped for default setting.
+        $this->assertEquals($expectedclean,
+            \core_customfield\data_controller::create($this->cfdata[1]->get('id'))->export_value());
+        $configdata = $this->cfields[1]->get('configdata');
+        $configdata['noclean'] = 1;
+        $this->cfields[1]->set('configdata', $configdata);
+
+        // Set noclean option for the field.
+        $sql = 'SELECT * FROM {customfield_field} WHERE id = ?';
+        $record = $DB->get_record_sql($sql, [$this->cfields[1]->get('id')]);
+        $configdata = json_decode($record->configdata);
+        $configdata->noclean = 1;
+        $record->configdata = json_encode($configdata);
+        $DB->update_record('customfield_field', $record);
+        // Tags are not stripped when noclean is set 1.
+        $this->assertEquals($expectednoclean,
+            \core_customfield\data_controller::create($this->cfdata[1]->get('id'))->export_value());
+    }
+
+    /**
      * Test for data_controller::get_value and export_value
      */
     public function test_get_export_value() {
