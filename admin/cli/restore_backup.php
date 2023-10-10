@@ -32,6 +32,7 @@ require_once($CFG->dirroot . "/backup/util/includes/restore_includes.php");
 list($options, $unrecognized) = cli_get_params([
     'file' => '',
     'categoryid' => '',
+    'courseid' => '',
     'showdebugging' => false,
     'help' => false,
 ], [
@@ -46,13 +47,15 @@ if ($unrecognized) {
     cli_error(get_string('cliunknowoption', 'admin', $unrecognized));
 }
 
-if ($options['help'] || !($options['file']) || !($options['categoryid'])) {
+if ($options['help'] || !($options['file']) || !($options['categoryid'] || $options['courseid'])) {
     $help = <<<EOL
-Restore backup into provided category.
+Restore backup into provided category or course.
+If courseid is set, course module/s will be added into the course.
 
 Options:
 -f, --file=STRING           Path to the backup file.
 -c, --categoryid=INT        ID of the category to restore too.
+    --courseid=INT          ID of the course to restore.
 -s, --showdebugging         Show developer level debugging information
 -h, --help                  Print out this help.
 
@@ -76,8 +79,16 @@ if (!file_exists($options['file'])) {
     throw new \moodle_exception('filenotfound');
 }
 
-if (!$category = $DB->get_record('course_categories', ['id' => $options['categoryid']], 'id')) {
-    throw new \moodle_exception('invalidcategoryid');
+if ($options['categoryid']) {
+    if (!$category = $DB->get_record('course_categories', ['id' => $options['categoryid']], 'id')) {
+        throw new \moodle_exception('invalidcategoryid');
+    }
+} else if ($options['courseid']) {
+    if (!$course = $DB->get_record('course', ['id' => $options['courseid']], 'id')) {
+        throw new \moodle_exception('invalidcourseid');
+    }
+} else {
+    throw new \moodle_exception('invalidoption');
 }
 
 $backupdir = "restore_" . uniqid();
@@ -92,10 +103,15 @@ try {
     list($fullname, $shortname) = restore_dbops::calculate_course_names(0, get_string('restoringcourse', 'backup'),
         get_string('restoringcourseshortname', 'backup'));
 
-    $courseid = restore_dbops::create_new_course($fullname, $shortname, $category->id);
-
-    $rc = new restore_controller($backupdir, $courseid, backup::INTERACTIVE_NO,
-        backup::MODE_GENERAL, $admin->id, backup::TARGET_NEW_COURSE);
+    if ($course) {
+        $courseid = $course->id;
+        $rc = new restore_controller($backupdir, $courseid, backup::INTERACTIVE_NO,
+            backup::MODE_GENERAL, $admin->id, backup::TARGET_EXISTING_ADDING);
+    } else {
+        $courseid = restore_dbops::create_new_course($fullname, $shortname, $category->id);
+        $rc = new restore_controller($backupdir, $courseid, backup::INTERACTIVE_NO,
+            backup::MODE_GENERAL, $admin->id, backup::TARGET_NEW_COURSE);
+    }
     $rc->execute_precheck();
     $rc->execute_plan();
     $rc->destroy();
