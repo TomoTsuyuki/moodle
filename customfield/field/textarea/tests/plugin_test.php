@@ -187,6 +187,50 @@ class plugin_test extends \advanced_testcase {
     }
 
     /**
+     * Data provider for test_export_value_with_tag().
+     *
+     * @return array
+     */
+    public static function export_value_with_tag_provider(): array {
+        return [
+            'iframe tag' => [
+                'Text with iframe tag<iframe src="https://moodle.org/">',
+            ],
+            'object tag' => [
+                '"lala <object>xx</object>"',
+            ],
+        ];
+    }
+
+    /**
+     * Test export value with tag.
+     * @dataProvider export_value_with_tag_provider
+     * @param string $text HTML text to set to the customfield.
+     * @covers \customfield_textarea\data_controller::export_value
+     */
+    public function test_export_value_with_tag($text): void {
+        global $CFG, $DB;
+
+        require_once("{$CFG->dirroot}/customfield/tests/fixtures/test_instance_form.php");
+
+        $this->setAdminUser();
+        $handler = $this->cfcat->get_handler();
+
+        // Set our custom field value.
+        $submitdata = (array) $this->courses[1] + [
+                'customfield_myfield1_editor' => ['text' => $text, 'format' => FORMAT_HTML],
+                'customfield_myfield2_editor' => ['text' => $text, 'format' => FORMAT_HTML],
+            ];
+
+        core_customfield_test_instance_form::mock_submit($submitdata, []);
+        $form = new core_customfield_test_instance_form('post', ['handler' => $handler, 'instance' => $this->courses[1]]);
+        $handler->instance_form_save($form->get_data());
+
+        $this->assertEquals($text,
+            \core_customfield\data_controller::create($this->cfdata[1]->get('id'))->export_value());
+    }
+
+    /**
      * Deleting fields and data
      */
     public function test_delete() {

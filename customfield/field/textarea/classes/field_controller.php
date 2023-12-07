@@ -113,7 +113,13 @@ class field_controller extends \core_customfield\field_controller {
         if (!$context) {
             $context = $this->get_handler()->get_configuration_context();
         }
-        return ['maxfiles' => EDITOR_UNLIMITED_FILES, 'maxbytes' => $CFG->maxbytes, 'context' => $context];
+        return [
+            'maxfiles' => EDITOR_UNLIMITED_FILES,
+            'maxbytes' => $CFG->maxbytes,
+            'context' => $context,
+            'noclean' => true,
+            'trusttext' => false,
+        ];
     }
 
     /**
