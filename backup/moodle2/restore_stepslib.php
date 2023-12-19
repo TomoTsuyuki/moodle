@@ -5388,6 +5388,7 @@ class restore_move_module_questions_categories extends restore_execution_step {
                 $top = question_get_top_category($newcontext->newitemid, true);
                 $oldtopid = 0;
                 $categoryids = [];
+                $questioncategories = [];
                 foreach ($modulecats as $modulecat) {
                     // Before 3.5, question categories could be created at top level.
                     // From 3.5 onwards, all question categories should be a child of a special category called the "top" category.
@@ -5396,14 +5397,22 @@ class restore_move_module_questions_categories extends restore_execution_step {
                         $oldtopid = $modulecat->newitemid;
                         $modulecat->newitemid = $top->id;
                     } else {
-                        $cat = new stdClass();
-                        $cat->id = $modulecat->newitemid;
-                        $cat->contextid = $newcontext->newitemid;
-                        if (empty($info->parent)) {
-                            $cat->parent = $top->id;
+                        $catid = $modulecat->newitemid;
+                        $cat = $DB->get_record('question_categories', ['id' => $catid]);
+                        if ($cat) {
+                            $oldcontextid = $cat->contextid;
+                            $cat->contextid = $newcontext->newitemid;
+                            if (empty($info->parent)) {
+                                $cat->parent = $top->id;
+                            }
+                            $DB->update_record('question_categories', $cat);
+                            $questioncategories[$catid] = [
+                                'id' => $catid,
+                                'oldcontextid' => $oldcontextid,
+                                'newcontextid' => $newcontext->newitemid,
+                            ];
                         }
-                        $DB->update_record('question_categories', $cat);
-                        $categoryids[] = (int)$cat->id;
+                        $categoryids[] = (int)$catid;
                     }
 
                     // And set new contextid (and maybe update newitemid) also in question_category mapping (will be
@@ -5434,6 +5443,19 @@ class restore_move_module_questions_categories extends restore_execution_step {
                     ];
                     $params += $categoryidparams;
                     $DB->execute($sqlupdate, $params);
+
+                    // Update questionscontextid in question_set_references.
+                    foreach ($questioncategories as $questioncategory) {
+                        $references = $DB->get_records('question_set_references', ['questionscontextid' => $oldcontextid]);
+                        foreach ($references as $reference) {
+                            $filtercondition = json_decode($reference->filtercondition);
+                            if (!empty($filtercondition->questioncategoryid)
+                                && $filtercondition->questioncategoryid == $questioncategory['id']) {
+                                $reference->questionscontextid = $questioncategory['newcontextid'];
+                                $DB->update_record('question_set_references', $reference);
+                            }
+                        }
+                    }
                 }
 
                 // Now set the parent id for the question categories that were in the top category in the course context
