@@ -5388,6 +5388,7 @@ class restore_move_module_questions_categories extends restore_execution_step {
                 $top = question_get_top_category($newcontext->newitemid, true);
                 $oldtopid = 0;
                 $categoryids = [];
+                $qcatcontexts = [];
                 foreach ($modulecats as $modulecat) {
                     // Before 3.5, question categories could be created at top level.
                     // From 3.5 onwards, all question categories should be a child of a special category called the "top" category.
@@ -5404,6 +5405,7 @@ class restore_move_module_questions_categories extends restore_execution_step {
                         }
                         $DB->update_record('question_categories', $cat);
                         $categoryids[] = (int)$cat->id;
+                        $qcatcontexts[(int)$cat->id] = (int)$newcontext->newitemid;
                     }
 
                     // And set new contextid (and maybe update newitemid) also in question_category mapping (will be
@@ -5434,6 +5436,23 @@ class restore_move_module_questions_categories extends restore_execution_step {
                     ];
                     $params += $categoryidparams;
                     $DB->execute($sqlupdate, $params);
+
+                    // Update questionscontextid from question category in the filter condition, as we updated
+                    // contextid for some question categories earlier in this function.
+                    [$qcatcontextsql, $qcatcontextparams] = $DB->get_in_or_equal($qcatcontexts, SQL_PARAMS_NAMED);
+                    $sql = "SELECT id, questionscontextid, filtercondition
+                              FROM {question_set_references}
+                             WHERE usingcontextid {$qcatcontextsql} ";
+                    $references = $DB->get_records_sql($sql, $qcatcontextparams);
+                    foreach ($references as $reference) {
+                        $filtercondition = json_decode($reference->filtercondition);
+                        if (!empty($filtercondition->questioncategoryid)
+                            && !empty($qcatcontexts[$filtercondition->questioncategoryid])
+                            && $qcatcontexts[$filtercondition->questioncategoryid] != $reference->questionscontextid) {
+                            $reference->questionscontextid = $qcatcontexts[$filtercondition->questioncategoryid];
+                            $DB->update_record('question_set_references', $reference);
+                        }
+                    }
                 }
 
                 // Now set the parent id for the question categories that were in the top category in the course context
