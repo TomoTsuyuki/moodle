@@ -149,12 +149,13 @@ class restore_stepslib_test extends \advanced_testcase {
      * @covers \restore_move_module_questions_categories::process_section
      * @return void
      */
-    public function test_restore_random_question(): void {
+    public function test_restore_random_question_39(): void {
         global $DB, $USER;
 
         $this->resetAfterTest();
         $this->setAdminUser();
 
+        // Backup file is created from Moodle 3.9 site for testing the issue MDL-78902.
         $backupfile = 'test_random_question_39';
 
         // Extract backup file.
@@ -163,7 +164,7 @@ class restore_stepslib_test extends \advanced_testcase {
         get_file_packer('application/vnd.moodle.backup')->extract_to_pathname(
             __DIR__ . "/fixtures/$backupfile.mbz", $backuppath);
 
-        // Restore the quiz activity in the backup to a new course.
+        // Restore the quiz activity in the backup from Moodle 3.9 to a new course.
         $coursecat = self::getDataGenerator()->create_category();
         $course = self::getDataGenerator()->create_course(['category' => $coursecat->id]);
         $rc = new restore_controller($backupid, $course->id, backup::INTERACTIVE_NO,
@@ -175,12 +176,16 @@ class restore_stepslib_test extends \advanced_testcase {
         // Get information about the quiz activity and confirm the references are correct.
         $modinfo = get_fast_modinfo($course->id);
         $quizzes = array_values($modinfo->get_instances_of('quiz'));
+        // Get contextid for the restored quiz activity.
         $contextid = $quizzes[0]->context->id;
         $qcats = $DB->get_records('question_categories', ['contextid' => $contextid], 'parent');
+        // Confirm there are 2 question categories for the restored quiz activity.
         $this->assertEquals(['top', 'Default for Test MDL-78902 quiz'], array_column($qcats, 'name'));
+        // Get question_set_references records for the restored quiz activity.
         $references = $DB->get_records('question_set_references', ['usingcontextid' => $contextid]);
         foreach ($references as $reference) {
             $filtercondition = json_decode($reference->filtercondition);
+            // Confirm the questionscontextid is set correctly, which is from filter question category id.
             $this->assertEquals($reference->questionscontextid,
                 $qcats[$filtercondition->questioncategoryid]->contextid);
         }

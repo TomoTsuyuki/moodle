@@ -355,6 +355,8 @@ class restore_quiz_activity_structure_step extends restore_questions_activity_st
             $questionsetreference->component = 'mod_quiz';
             $questionsetreference->questionarea = 'slot';
             $questionsetreference->itemid = $data->id;
+            // This questionscontextid needs to be updated in restore_move_module_questions_categories class after contextid
+            // is updated for questioncategory. This questioncontextid is from question category in the filter condition.
             $questionsetreference->questionscontextid = $question->questioncontextid;
             $filtercondition = new stdClass();
             $filtercondition->questioncategoryid = $question->category;

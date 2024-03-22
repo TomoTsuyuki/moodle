@@ -5411,6 +5411,7 @@ class restore_move_module_questions_categories extends restore_execution_step {
                         }
                         $DB->update_record('question_categories', $cat);
                         $categoryids[] = (int)$cat->id;
+                        // Keep new contextid by question category for updating questionscontextid in question_set_references.
                         $qcatcontexts[(int)$cat->id] = (int)$newcontext->newitemid;
                     }
 
@@ -5455,6 +5456,7 @@ class restore_move_module_questions_categories extends restore_execution_step {
                         if (!empty($filtercondition->questioncategoryid)
                             && !empty($qcatcontexts[$filtercondition->questioncategoryid])
                             && $qcatcontexts[$filtercondition->questioncategoryid] != $reference->questionscontextid) {
+                            // Update the new questioncontextid when it's set different one.
                             $reference->questionscontextid = $qcatcontexts[$filtercondition->questioncategoryid];
                             $DB->update_record('question_set_references', $reference);
                         }
