@@ -408,24 +408,28 @@ function(
         var pageItems = root.find(SELECTORS.PAGE_ITEM);
         // We want to request all of the strings at once rather than
         // one at a time.
-        var stringRequests = pageItems.toArray().map(function(index, page) {
+        var stringRequests = pageItems.toArray().map(function(page) {
             page = $(page);
             var pageNumber = getPageNumber(root, page);
 
-            if (pageNumber === activePageNumber) {
-                return {
-                    key: activePageAriaLabelComponents[0],
-                    component: activePageAriaLabelComponents[1],
-                    param: pageNumber
-                };
+            if (['next', 'previous'].includes(page.attr('data-control'))) {
+                return {};
             } else {
-                return {
-                    key: pageAriaLabelComponents[0],
-                    component: pageAriaLabelComponents[1],
-                    param: pageNumber
-                };
+                if (pageNumber === activePageNumber) {
+                    return {
+                        key: activePageAriaLabelComponents[0],
+                        component: activePageAriaLabelComponents[1],
+                        param: pageNumber
+                    };
+                } else {
+                    return {
+                        key: pageAriaLabelComponents[0],
+                        component: pageAriaLabelComponents[1],
+                        param: pageNumber
+                    };
+                }
             }
-        });
+        }).filter(Boolean);
 
         Str.get_strings(stringRequests).then(function(strings) {
             pageItems.each(function(index, page) {
