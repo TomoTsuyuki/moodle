@@ -286,28 +286,32 @@ function stats_cron_daily($maxdays=1) {
 
         // Set stat2 to the number distinct users with role assignments in the course that were active
         // using table alias in UPDATE does not work in pg < 8.2
+        $sql = "INSERT INTO {temp_role_course_usercount} (roleid, courseid, usercount)
+                     SELECT te.roleid, te.courseid, COUNT(DISTINCT te.userid) as usercount
+                       FROM {temp_enroled} te
+                       JOIN (
+                         SELECT DISTINCT course, userid
+                           FROM {temp_log1}
+                            ) l ON l.course = te.courseid AND l.userid = te.userid
+                   GROUP BY te.roleid, te.courseid";
+        if ($logspresent && !stats_run_query($sql)) {
+            $failed = true;
+            break;
+        }
+
         $sql = "UPDATE {temp_stats_daily}
-                   SET stat2 = (
-
-                    SELECT COUNT(DISTINCT userid)
-                      FROM {temp_enroled} te
-                     WHERE roleid = {temp_stats_daily}.roleid
-                       AND courseid = {temp_stats_daily}.courseid
-                       AND EXISTS (
-
-                        SELECT 'x'
-                          FROM {temp_log1} l
-                         WHERE l.course = {temp_stats_daily}.courseid
-                           AND l.userid = te.userid
-                                  )
-                               )
+                   SET stat2 = COALESCE(
+                       (SELECT usercount
+                          FROM {temp_role_course_usercount}
+                         WHERE {temp_role_course_usercount}.courseid = {temp_stats_daily}.courseid
+                           AND {temp_role_course_usercount}.roleid = {temp_stats_daily}.roleid)
+                       , stat2)
                  WHERE {temp_stats_daily}.stattype = 'enrolments'
                    AND {temp_stats_daily}.timeend = $nextmidnight
                    AND {temp_stats_daily}.courseid IN (
 
                     SELECT DISTINCT course FROM {temp_log2})";
-
-        if ($logspresent && !stats_run_query($sql, array('courselevel'=>CONTEXT_COURSE))) {
+        if ($logspresent && !stats_run_query($sql)) {
             $failed = true;
             break;
         }
@@ -329,29 +333,31 @@ function stats_cron_daily($maxdays=1) {
         stats_progress('5');
 
         // Set stat 2 to the number of enrolled users who were active in the course
+        $sql = "INSERT INTO {temp_course_usercount} (courseid, usercount)
+                     SELECT te.courseid, COUNT(DISTINCT te.userid) as usercount
+                       FROM {temp_enroled} te
+                       JOIN (
+                              SELECT DISTINCT course, userid
+                                FROM {temp_log1}
+                            ) l ON l.course = te.courseid AND l.userid = te.userid
+                   GROUP BY te.courseid";
+        if (!stats_run_query($sql)) {
+            $failed = true;
+            break;
+        }
         $sql = "UPDATE {temp_stats_daily}
-                   SET stat2 = (
-
-                    SELECT COUNT(DISTINCT te.userid)
-                      FROM {temp_enroled} te
-                     WHERE te.courseid = {temp_stats_daily}.courseid
-                       AND EXISTS (
-
-                        SELECT 'x'
-                          FROM {temp_log1} l
-                         WHERE l.course = {temp_stats_daily}.courseid
-                           AND l.userid = te.userid
-                                  )
-                               )
-
+                   SET stat2 = COALESCE(
+                       (SELECT usercount
+                          FROM {temp_course_usercount}
+                         WHERE {temp_course_usercount}.courseid = {temp_stats_daily}.courseid)
+                       , stat2)
                  WHERE {temp_stats_daily}.stattype = 'enrolments'
                    AND {temp_stats_daily}.timeend = $nextmidnight
                    AND {temp_stats_daily}.roleid = 0
                    AND {temp_stats_daily}.courseid IN (
-
-                    SELECT l.course
-                      FROM {temp_log2} l
-                     WHERE l.course <> ".SITEID.")";
+                       SELECT l.course
+                         FROM {temp_log2} l
+                        WHERE l.course <> " . SITEID . ")";
 
         if ($logspresent && !stats_run_query($sql, array())) {
             $failed = true;
@@ -1653,6 +1659,23 @@ function stats_temp_table_create() {
     $tables['temp_log2'] = clone $tables['temp_log1'];
     $tables['temp_log2']->setName('temp_log2');
 
+    $table = new xmldb_table('temp_role_course_usercount');
+    $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+    $table->add_field('roleid', XMLDB_TYPE_INTEGER, 10, null, XMLDB_NOTNULL, null, '0');
+    $table->add_field('courseid', XMLDB_TYPE_INTEGER, 10, null, XMLDB_NOTNULL, null, '0');
+    $table->add_field('usercount', XMLDB_TYPE_INTEGER, 10, null, XMLDB_NOTNULL, null, '0');
+    $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+    $table->add_index('usercourse', XMLDB_INDEX_NOTUNIQUE, ['roleid', 'courseid']);
+    $tables['temp_role_course_usercount'] = $table;
+
+    $table = new xmldb_table('temp_course_usercount');
+    $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+    $table->add_field('courseid', XMLDB_TYPE_INTEGER, 10, null, XMLDB_NOTNULL, null, '0');
+    $table->add_field('usercount', XMLDB_TYPE_INTEGER, 10, null, XMLDB_NOTNULL, null, '0');
+    $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+    $table->add_index('course', XMLDB_INDEX_NOTUNIQUE, ['courseid']);
+    $tables['temp_course_usercount'] = $table;
+
     try {
 
         foreach ($tables as $table) {
@@ -1675,7 +1698,15 @@ function stats_temp_table_drop() {
 
     $dbman = $DB->get_manager();
 
-    $tables = array('temp_log1', 'temp_log2', 'temp_stats_daily', 'temp_stats_user_daily', 'temp_enroled');
+    $tables = [
+        'temp_log1',
+        'temp_log2',
+        'temp_stats_daily',
+        'temp_stats_user_daily',
+        'temp_enroled',
+        'temp_role_course_usercount',
+        'temp_course_usercount',
+    ];
 
     foreach ($tables as $name) {
 
