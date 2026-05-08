@@ -39,7 +39,15 @@ final class statslib_test extends \advanced_testcase {
     const TIMEZONE = 0;
 
     /** @var array The list of temporary tables created for the statistic calculations **/
-    protected $tables = array('temp_log1', 'temp_log2', 'temp_stats_daily', 'temp_stats_user_daily');
+    protected $tables = [
+        'temp_log1',
+        'temp_log2',
+        'temp_stats_daily',
+        'temp_stats_user_daily',
+        'temp_enroled',
+        'temp_role_course_usercount',
+        'temp_course_usercount',
+    ];
 
     /** @var array The replacements to be used when loading XML files **/
     protected $replacements = null;
