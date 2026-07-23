@@ -39,7 +39,15 @@ final class statslib_test extends \advanced_testcase {
     const TIMEZONE = 0;
 
     /** @var array The list of temporary tables created for the statistic calculations **/
-    protected $tables = array('temp_log1', 'temp_log2', 'temp_stats_daily', 'temp_stats_user_daily');
+    protected $tables = [
+        'temp_log1',
+        'temp_log2',
+        'temp_stats_daily',
+        'temp_stats_user_daily',
+        'temp_enroled',
+        'temp_role_course_usercount',
+        'temp_course_usercount',
+    ];
 
     /** @var array The replacements to be used when loading XML files **/
     protected $replacements = null;
@@ -731,6 +739,113 @@ final class statslib_test extends \advanced_testcase {
         ob_end_clean();
 
         $this->verify_stats($stats, $output);
+    }
+
+    /**
+     * Test that stat2 correctly counts only active enrolled users after the optimisation.
+     *
+     * Two users are enrolled in a course but only one has activity during the period.
+     * Stat2 must equal 1 (the active user only), not 2 (all enrolled users).
+     * This confirms the pre-computed temp table queries are equivalent to the original
+     * correlated subquery approach.
+     *
+     * A second course is used where no enrolled user was active, verifying that the
+     * COALESCE(NULL, 0) fallback correctly produces stat2 = 0.
+     *
+     * @covers ::stats_cron_daily
+     */
+    public function test_statslib_cron_daily_stat2_counts_only_active_enrolled_users(): void {
+        global $DB;
+
+        $datagen = self::getDataGenerator();
+        $user1       = $DB->get_record('user', ['username' => 'user1']);
+        $user2       = $DB->get_record('user', ['username' => 'user2']);
+        $course1     = $DB->get_record('course', ['shortname' => 'course1']);
+        $studentrole = $DB->get_record('role', ['shortname' => 'student']);
+
+        // User1 is already enrolled in course1 from setUp(). Enrol user2 as well.
+        // Two users are enrolled; only user1 will be active during the stats period.
+        $datagen->enrol_user($user2->id, $course1->id);
+
+        // Create course2 where user2 is enrolled but will have no activity.
+        // User1 (not enrolled in course2) generates activity so course2 appears in temp_log2.
+        // This forces the COALESCE(NULL, 0) fallback path in the UPDATE queries.
+        $course2 = $datagen->create_course(['shortname' => 'course2']);
+        $datagen->enrol_user($user2->id, $course2->id);
+
+        $start = stats_get_base_daily(self::DAY + 3600);
+
+        // Course1: user1 (enrolled) is active. user2 (enrolled) is not active.
+        $DB->insert_record('log', (object) [
+            'time'   => $start + 14410,
+            'userid' => $user1->id,
+            'course' => $course1->id,
+            'action' => 'view',
+            'module' => '',
+            'cmid'   => 0,
+            'ip'     => '',
+            'url'    => '',
+            'info'   => '',
+        ]);
+
+        // Course2: user1 (not enrolled) is active. user2 (enrolled) is not active.
+        // No enrolled user was active, so no row enters temp_role_course_usercount for course2.
+        $DB->insert_record('log', (object) [
+            'time'   => $start + 14420,
+            'userid' => $user1->id,
+            'course' => $course2->id,
+            'action' => 'view',
+            'module' => '',
+            'cmid'   => 0,
+            'ip'     => '',
+            'url'    => '',
+            'info'   => '',
+        ]);
+
+        ob_start();
+        stats_cron_daily(1);
+        ob_end_clean();
+
+        // Role-level enrolment stats for course1 / student role.
+        // Stat1 = 2: both user1 and user2 are enrolled.
+        // Stat2 = 1: only user1 was active — the optimised queries must not include user2.
+        $rolestat = $DB->get_record('stats_daily', [
+            'courseid' => $course1->id,
+            'roleid'   => $studentrole->id,
+            'stattype' => 'enrolments',
+        ]);
+        $this->assertNotFalse($rolestat, 'Enrolment stat record for course1/student role not found');
+        $this->assertEquals(2, (int) $rolestat->stat1, 'stat1 must count all enrolled users (user1 + user2)');
+        $this->assertEquals(1, (int) $rolestat->stat2, 'stat2 must count only active enrolled users (user1 only)');
+
+        // Course-level enrolment totals (roleid = 0) should show the same counts.
+        $coursestat = $DB->get_record('stats_daily', [
+            'courseid' => $course1->id,
+            'roleid'   => 0,
+            'stattype' => 'enrolments',
+        ]);
+        $this->assertNotFalse($coursestat, 'Course-level enrolment stat record for course1 not found');
+        $this->assertEquals(2, (int) $coursestat->stat1, 'stat1 must count all enrolled users');
+        $this->assertEquals(1, (int) $coursestat->stat2, 'stat2 must count only active enrolled users');
+
+        // Course2: no enrolled user was active, so no row is inserted into the pre-computed
+        // Temp tables. The UPDATE uses COALESCE(NULL, 0), which must produce stat2 = 0.
+        // This directly tests the COALESCE fallback path.
+        $rolestat2 = $DB->get_record('stats_daily', [
+            'courseid' => $course2->id,
+            'roleid'   => $studentrole->id,
+            'stattype' => 'enrolments',
+        ]);
+        $this->assertNotFalse($rolestat2, 'Enrolment stat record for course2/student role not found');
+        $this->assertEquals(0, (int) $rolestat2->stat2, 'stat2 must be 0 when no enrolled user was active (COALESCE fallback)');
+
+        $coursestat2 = $DB->get_record('stats_daily', [
+            'courseid' => $course2->id,
+            'roleid'   => 0,
+            'stattype' => 'enrolments',
+        ]);
+        $this->assertNotFalse($coursestat2, 'Course-level enrolment stat record for course2 not found');
+        $this->assertEquals(0, (int) $coursestat2->stat2, 'stat2 must be 0 when no enrolled user was active (COALESCE fallback)');
     }
 
     /**
